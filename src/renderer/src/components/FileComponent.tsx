@@ -24,20 +24,40 @@ function FileDrop(): JSX.Element {
   }, [])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop })
+  const hasData = coverImages.length > 0
 
   return (
     <div
-      className="border-gray-500 border grid place-items-center rounded-3xl w-[50vw] h-[50vh]"
+      style={
+        hasData
+          ? {
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+              gridAutoFlow: 'row'
+            }
+          : {}
+      }
+      className={
+        hasData
+          ? 'border-gray-500 border min-w-[100vw] min-h-[100vh] '
+          : 'border-gray-500 border grid place-items-center rounded-3xl w-[50vw] h-[50vh]'
+      }
       {...getRootProps()}
     >
       <input
         // className="border-gray-500 border rounded-3xl w-[50vw] h-[50vh]"
         {...getInputProps()}
       />
-      {isDragActive ? (
+      {isDragActive && !hasData ? (
         <p>Drop the files here ...</p>
-      ) : coverImages.length > 0 ? (
-        coverImages.map((image, idx) => <img src={image} alt="cover image" key={idx + image} />)
+      ) : hasData ? (
+        coverImages.map((image, idx) => (
+          <div className=" p-2" key={idx + image}>
+            <div className="rounded-3xl shadow-2xl overflow-hidden">
+              <img className="object-fill" src={image} width={150} alt="cover image" />
+            </div>
+          </div>
+        ))
       ) : (
         <p>Drag and drop some files here, or click to select files</p>
       )}
