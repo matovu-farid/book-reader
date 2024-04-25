@@ -1,8 +1,10 @@
+import { useQuery } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 
 function FileDrop(): JSX.Element {
   const [coverImages, setCoverImages] = useState<string[]>([])
+  // const bookQuery = useQuery(['books'], async () => {})
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     acceptedFiles.forEach(async (file) => {
