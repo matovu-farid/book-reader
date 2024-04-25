@@ -39,6 +39,7 @@
     "get-epub-cover": "^1.0.5",
     "md5": "^2.3.0",
     "react-dropzone": "^14.2.3",
+    "react-spinners": "^0.13.8",
     "serve-index": "^1.9.1",
     "serve-static": "^1.15.0",
     "xml-js": "^1.6.11"

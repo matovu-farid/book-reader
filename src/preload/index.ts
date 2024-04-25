@@ -12,7 +12,8 @@ if (process.contextIsolated) {
     contextBridge.exposeInMainWorld('electron', electronAPI)
     contextBridge.exposeInMainWorld('api', api)
     contextBridge.exposeInMainWorld('functions', {
-      getCoverImage: (filePath: string) => ipcRenderer.invoke('getCoverImage', filePath)
+      getCoverImage: (filePath: string) => ipcRenderer.invoke('getCoverImage', filePath),
+      getBooks: () => ipcRenderer.invoke('getBooks')
     })
   } catch (error) {
     console.error(error)

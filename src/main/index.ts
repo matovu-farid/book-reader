@@ -2,7 +2,7 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import getCoverImage from './modules/epub'
+import getCoverImage, { getBooks } from './modules/epub'
 
 function createWindow(): void {
   // Create the browser window.
@@ -39,6 +39,7 @@ function createWindow(): void {
 
 function iPCHandlers(): void {
   ipcMain.handle('getCoverImage', (_, filePath) => getCoverImage(filePath))
+  ipcMain.handle('getBooks', () => getBooks())
 }
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.

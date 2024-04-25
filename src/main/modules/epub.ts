@@ -37,20 +37,28 @@ interface Book {
   title: string
 }
 
+export function getBookPath(): string {
+  const bookPath = path.join(app.getPath('appData'), 'public', 'books')
+  fs.access(bookPath).catch(() => fs.mkdir(bookPath, { recursive: true }))
+  return bookPath
+}
+
 function unzipEpub(filePath: string, outDir: string): string {
-  const outputDirUrl = path.join(app.getPath('appData'), 'public', outDir) // Crea
+  const outputDirUrl = path.join(getBookPath(), outDir) // Crea
   const zip = new AdmZip(filePath)
   zip.extractAllTo(outputDirUrl, true)
   return outputDirUrl
 }
 async function parseEpub(outputDir: string): Promise<Book> {
   try {
-    const containerPath = path.join(outputDir, 'META-INF', 'container.xml')
+    const outputDirUrl = path.join(getBookPath(), outputDir)
+    const containerPath = path.join(outputDirUrl, 'META-INF', 'container.xml')
+    console.log({ containerPath })
 
     const containerData = await fs.readFile(containerPath, 'utf8')
     const containerObj = convert.xml2js(containerData, { compact: true }) as Container
     const opfFilePath = containerObj.container.rootfiles.rootfile._attributes['full-path']
-    const opfFileData = await fs.readFile(path.join(outputDir, opfFilePath), 'utf8')
+    const opfFileData = await fs.readFile(path.join(outputDirUrl, opfFilePath), 'utf8')
     const opf: OPF = convert.xml2js(opfFileData, { compact: true }) as OPF
 
     const opfFileObj = opf.package
@@ -77,12 +85,12 @@ async function parseEpub(outputDir: string): Promise<Book> {
         }
         return {
           idref: item.idref,
-          route: routeFromPath(path.join(outputDir, opfDir, manifestItem.href)) || '',
+          route: routeFromPath(path.join(outputDirUrl, opfDir, manifestItem.href)) || '',
           mediaType: manifestItem['media-type']
         }
       })
     return {
-      cover: (await getCoverRoute(outputDir)) || '',
+      cover: (await getCoverRoute(outputDirUrl)) || '',
       spine,
       title
     }
@@ -123,13 +131,10 @@ export default async function getCoverImage(filePath: string): Promise<string | 
   const outDir = md5(filePath)
   const outDirUrl = unzipEpub(filePath, outDir)
 
-  parseEpub(outDirUrl).then((data) => {
-    console.log(data)
-  })
   return getCoverRoute(outDirUrl)
 }
 
 export async function getBooks(): Promise<Book[]> {
-  const booksPaths = await fs.readdir(path.join(app.getPath('appData'), 'public'))
+  const booksPaths = await fs.readdir(getBookPath())
   return Promise.all(booksPaths.map(async (bookPath) => parseEpub(bookPath)))
 }
