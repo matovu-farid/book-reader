@@ -4,23 +4,20 @@ import { useDropzone } from 'react-dropzone'
 function FileDrop(): JSX.Element {
   const [coverImages, setCoverImages] = useState<string[]>([])
 
-  const onDrop = useCallback(async (acceptedFiles) => {
-    // Do something with the files
-    if (acceptedFiles.length === 0) {
-      return
-    }
-    const file: File = acceptedFiles[0]
-    if (file.type !== 'application/epub+zip') {
-      console.error('Invalid file type')
-      return
-    }
-    console.log({ path: file.path })
-    const coverImage = await window.functions.getCoverImage(file.path)
-    if (coverImage === null) {
-      console.error('Failed to get cover image')
-      return
-    }
-    setCoverImages((prev) => [...prev, coverImage])
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    acceptedFiles.forEach(async (file) => {
+      if (file.type !== 'application/epub+zip') {
+        console.error('Invalid file type')
+        return
+      }
+      console.log({ path: file.path })
+      const coverImage = await window.functions.getCoverImage(file.path)
+      if (coverImage === null) {
+        console.error('Failed to get cover image')
+        return
+      }
+      setCoverImages((prev) => [...prev, coverImage])
+    })
   }, [])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop })

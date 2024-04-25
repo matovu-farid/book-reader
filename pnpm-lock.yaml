@@ -20,6 +20,9 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.32.0
         version: 5.32.0(react@18.2.0)
+      '@types/adm-zip':
+        specifier: ^0.5.5
+        version: 0.5.5
       '@types/express':
         specifier: ^4.17.21
         version: 4.17.21
@@ -65,6 +68,9 @@ importers:
       serve-static:
         specifier: ^1.15.0
         version: 1.15.0
+      xml-js:
+        specifier: ^1.6.11
+        version: 1.6.11
     devDependencies:
       '@electron-toolkit/eslint-config-prettier':
         specifier: ^2.0.0
@@ -778,6 +784,9 @@ packages:
   '@tootallnate/once@2.0.0':
     resolution: {integrity: sha512-XCuKFP5PS55gnMVu3dty8KPatLqUoy/ZYzDzAGCQ8JNFCkLXzmI7vNHCR+XpbZaMWQK/vQubr7PkYq8g470J/A==}
     engines: {node: '>= 10'}
+
+  '@types/adm-zip@0.5.5':
+    resolution: {integrity: sha512-YCGstVMjc4LTY5uK9/obvxBya93axZOVOyf2GSUulADzmLhYE45u2nAssCs/fWBs1Ifq5Vat75JTPwd5XZoPJw==}
 
   '@types/babel__core@7.20.5':
     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}
@@ -3835,6 +3844,10 @@ snapshots:
 
   '@tootallnate/once@2.0.0': {}
 
+  '@types/adm-zip@0.5.5':
+    dependencies:
+      '@types/node': 20.12.7
+
   '@types/babel__core@7.20.5':
     dependencies:
       '@babel/parser': 7.24.4
@@ -3904,7 +3917,7 @@ snapshots:
 
   '@types/keyv@3.1.4':
     dependencies:
-      '@types/node': 18.19.31
+      '@types/node': 20.12.7
 
   '@types/md5@2.3.5': {}
 
