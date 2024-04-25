@@ -1,21 +1,8 @@
-import { useMutation } from '@tanstack/react-query'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 
 function FileDrop(): JSX.Element {
   const [coverImages, setCoverImages] = useState<string[]>([])
-  const [imageUrls, setImageUrls] = useState<string[]>([])
-
-  const mutation = useMutation({
-    mutationFn: fetchImages,
-    onSuccess: (data) => {
-      setImageUrls(data)
-    }
-  })
-
-  useEffect(() => {
-    mutation.mutate()
-  }, [coverImages])
 
   const onDrop = useCallback(async (acceptedFiles) => {
     // Do something with the files
@@ -36,15 +23,6 @@ function FileDrop(): JSX.Element {
     setCoverImages((prev) => [...prev, coverImage])
   }, [])
 
-  async function fetchImages(): Promise<string[]> {
-    return await Promise.all(
-      coverImages.map(async (imagePath) => {
-        const response = await fetch(`file://${imagePath}`)
-        const blob = await response.blob()
-        return URL.createObjectURL(blob)
-      })
-    )
-  }
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop })
 
   return (
@@ -58,8 +36,8 @@ function FileDrop(): JSX.Element {
       />
       {isDragActive ? (
         <p>Drop the files here ...</p>
-      ) : imageUrls.length > 0 ? (
-        imageUrls.map((image, idx) => <img src={image} alt="cover image" key={idx + image} />)
+      ) : coverImages.length > 0 ? (
+        coverImages.map((image, idx) => <img src={image} alt="cover image" key={idx + image} />)
       ) : (
         <p>Drag and drop some files here, or click to select files</p>
       )}
