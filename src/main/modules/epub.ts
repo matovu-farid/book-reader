@@ -1,12 +1,12 @@
 import path from 'path'
 import getEpubCover from 'get-epub-cover'
 import AdmZip from 'adm-zip'
-import { app } from 'electron'
+import { app, MessageChannelMain } from 'electron'
 import { PORT } from './express'
 import md5 from 'md5'
 import convert from 'xml-js'
 import fs from 'fs/promises'
-import type { Book, ManifestAttr, OPF, Container, Store } from '../../shared/types'
+import type { Book, ManifestAttr, OPF, Container, Store, Asset } from '../../shared/types'
 
 export function getBookPath(): string {
   const bookPath = path.join(app.getPath('appData'), 'public', 'books')
@@ -72,18 +72,46 @@ async function getManifestFiles(bookFolder: string) {
   const manifest: ManifestAttr[] = opfFileObj.manifest.item.map((item) => item._attributes)
   return { manifest, opfFileObj, opfFilePath, workingFolder }
 }
+export async function getAssets(bookFolder: string) {
+  const { manifest, workingFolder } = await getManifestFiles(bookFolder)
+
+  const assetTypes: Record<string, Asset> = {
+    'text/css': 'css',
+    'application/x-font-ttf': 'font',
+    'application/x-font-truetype': 'font',
+    'application/x-font-opentype': 'font',
+    'application/font-woff': 'font',
+    'application/font-woff2': 'font',
+    'application/vnd.ms-fontobject': 'font',
+    'application/font-sfnt': 'font'
+  }
+  const assets = Object.groupBy(manifest, (item) => {
+    if (!assetTypes[item['media-type']]) {
+      return 'other'
+    }
+    return assetTypes[item['media-type']]
+  })
+  delete assets['other']
+
+  Object.values(assets).forEach((value) => {
+    value.forEach((file) => {
+      file.href = getRouteFromRelativePath(workingFolder, file.href)
+    })
+  })
+
+  // const cssFiles = manifest
+  //   .filter((fileType) => fileType['media-type'] === 'text/css')
+  //   .map((file) => {
+  //     file.href = getRouteFromRelativePath(workingFolder, file.href)
+  //     return file
+  //   })
+  return assets
+}
 async function parseEpub(bookFolder: string): Promise<Book> {
+  const assets = await getAssets(bookFolder)
   const absoluteBookPath = path.join(getBookPath(), bookFolder)
   try {
-    const { manifest, opfFileObj, opfFilePath, workingFolder } = await getManifestFiles(bookFolder)
-
-    const cssFiles = manifest
-      .filter((fileType) => fileType['media-type'] === 'text/css')
-      .map((file) => {
-        file.href = getRouteFromRelativePath(workingFolder, file.href)
-        return file
-      })
-    console.log({ cssFiles })
+    const { manifest, opfFileObj, opfFilePath } = await getManifestFiles(bookFolder)
 
     const manifestMap: Map<string, ManifestAttr> = new Map()
     manifest.forEach((item: ManifestAttr) => {
@@ -118,7 +146,8 @@ async function parseEpub(bookFolder: string): Promise<Book> {
       cover: (await getCoverRoute(absoluteBookPath)) || '',
       spine,
       title,
-      internalFolderName: bookFolder
+      internalFolderName: bookFolder,
+      assets
     }
   } catch (e) {
     if (e instanceof Error) {
@@ -131,7 +160,8 @@ async function parseEpub(bookFolder: string): Promise<Book> {
       cover: '',
       spine: [],
       title: '',
-      internalFolderName: bookFolder
+      internalFolderName: bookFolder,
+      assets: []
     }
   }
 }
@@ -166,5 +196,6 @@ export default async function getCoverImage(filePath: string): Promise<string | 
 
 export async function getBooks(): Promise<Book[]> {
   const booksPaths = await fs.readdir(getBookPath())
+
   return Promise.all(booksPaths.map(async (bookPath) => parseEpub(bookPath)))
 }

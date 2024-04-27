@@ -22,6 +22,7 @@ export interface Container {
   }
 }
 
+export type Asset = 'css' | 'font' | 'other'
 export interface Book {
   currentBookId: number
   cover: string
@@ -29,6 +30,7 @@ export interface Book {
   title: string
   id: string
   internalFolderName: string
+  assets: Partial<Record<Asset, ManifestAttr[]>>
 }
 
 export interface Store {
