@@ -53,7 +53,6 @@ async function parseEpub(outputDir: string): Promise<Book> {
   try {
     const outputDirUrl = path.join(getBookPath(), outputDir)
     const containerPath = path.join(outputDirUrl, 'META-INF', 'container.xml')
-    console.log({ containerPath })
 
     const containerData = await fs.readFile(containerPath, 'utf8')
     const containerObj = convert.xml2js(containerData, { compact: true }) as Container

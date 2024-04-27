@@ -1,10 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import Loader from './Loader'
 
 function FileDrop(): JSX.Element {
-  const [coverImages, setCoverImages] = useState<string[]>([])
   const queryClient = useQueryClient()
   const {
     isPending,
@@ -14,7 +13,7 @@ function FileDrop(): JSX.Element {
   } = useQuery({
     queryKey: ['books'],
     queryFn: () => window.functions.getBooks()
-  }) // const bookQuery = useQuery(['books'], async () => {})
+  })
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     acceptedFiles.forEach(async (file) => {
@@ -40,7 +39,6 @@ function FileDrop(): JSX.Element {
         <Loader />
       </div>
     )
-  console.log({ books })
   return (
     <div
       style={
@@ -59,22 +57,27 @@ function FileDrop(): JSX.Element {
       }
       {...getRootProps()}
     >
-      <input
-        // className="border-gray-500 border rounded-3xl w-[50vw] h-[50vh]"
-        {...getInputProps()}
-      />
+      <input {...getInputProps()} />
       {isDragActive && !books ? (
         <p>Drop the files here ...</p>
       ) : books ? (
-        books
-          .map((book) => book.cover)
-          .map((image, idx) => (
-            <div className=" p-2" key={idx + image}>
-              <div className="rounded-3xl shadow-2xl overflow-hidden">
-                <img className="object-fill" src={image} width={150} alt="cover image" />
-              </div>
+        books.map((book, idx) => (
+          <div className="p-2 " key={idx + book.cover}>
+            <button
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+              }}
+              className="rounded-3xl bg-transparent shadow-2xl overflow-hidden"
+            >
+              <img className="object-fill" src={book.cover} width={150} alt="cover image" />
+            </button>
+
+            <div className="text-teal-500 justify-center p-2 overflow-hidden text-ellipsis whitespace-nowrap text-sm">
+              {book.title}
             </div>
-          ))
+          </div>
+        ))
       ) : (
         <p>Drag and drop some files here, or click to select files</p>
       )}
