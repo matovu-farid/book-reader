@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import Loader from './Loader'
+import { Link } from '@tanstack/react-router'
 
 function FileDrop(): JSX.Element {
   const queryClient = useQueryClient()
@@ -62,7 +63,7 @@ function FileDrop(): JSX.Element {
         <p>Drop the files here ...</p>
       ) : books ? (
         books.map((book, idx) => (
-          <div className="p-2 " key={idx + book.cover}>
+          <div key={idx + book.cover} className="p-2 ">
             <button
               onClick={(e) => {
                 e.preventDefault()
@@ -70,9 +71,14 @@ function FileDrop(): JSX.Element {
               }}
               className="rounded-3xl bg-transparent shadow-2xl overflow-hidden"
             >
-              <img className="object-fill" src={book.cover} width={150} alt="cover image" />
+              <Link
+                to="/books/$id"
+                params={{ id: book.id }}
+                className="rounded-3xl bg-transparent shadow-2xl overflow-hidden"
+              >
+                <img className="object-fill" src={book.cover} width={150} alt="cover image" />
+              </Link>
             </button>
-
             <div className="text-teal-500 justify-center p-2 overflow-hidden text-ellipsis whitespace-nowrap text-sm">
               {book.title}
             </div>

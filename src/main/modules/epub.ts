@@ -6,36 +6,7 @@ import { PORT } from './express'
 import md5 from 'md5'
 import convert from 'xml-js'
 import fs from 'fs/promises'
-
-interface ManifestAttr {
-  id: string
-  href: string
-  'media-type': string
-  properties?: string
-}
-
-interface OPF {
-  package: {
-    metadata: { 'dc:title': { _text: string } }
-    manifest: { item: { _attributes: ManifestAttr }[] }
-    spine: { itemref: { _attributes: { idref: string } }[] }
-    guide: unknown
-  }
-}
-
-interface Container {
-  container: {
-    rootfiles: {
-      rootfile: { _attributes: { 'full-path': string } }
-    }
-  }
-}
-
-interface Book {
-  cover: string
-  spine: { idref: string; route: string; mediaType: string }[]
-  title: string
-}
+import type { Book, ManifestAttr, OPF, Container, Store } from '../../shared/types'
 
 export function getBookPath(): string {
   const bookPath = path.join(app.getPath('appData'), 'public', 'books')
@@ -43,15 +14,50 @@ export function getBookPath(): string {
   return bookPath
 }
 
+export async function saveBookStore(data: Store, outputDir: string): Promise<string> {
+  const jsonString = JSON.stringify(data)
+  const bookStorePath = path.join(getBookPath(), outputDir, 'store.json')
+  await fs.writeFile(bookStorePath, jsonString)
+  return bookStorePath
+}
+
+export function fetchBookStoreData(bookStorePath: string): Promise<Store> {
+  return fs
+    .readFile(bookStorePath)
+    .then((data) => JSON.parse(data.toString()))
+    .catch(() => ({ currentBookId: 0 }))
+}
+
+export async function getBookStore(bookFolder: string): Promise<Store> {
+  const bookStorePath = path.join(getBookPath(), bookFolder, 'store.json')
+  return fs
+    .access(bookStorePath)
+    .then(() => fetchBookStoreData(bookStorePath))
+    .catch(() => {
+      return saveBookStore({ currentBookId: 0 }, bookFolder).then(() =>
+        fetchBookStoreData(bookStorePath)
+      )
+    })
+}
+
+export function updateCurrentBookId(bookFolder: string, currentBookId: number): Promise<string> {
+  return getBookStore(bookFolder).then((store) => {
+    store.currentBookId = currentBookId
+    return saveBookStore(store, bookFolder)
+  })
+}
+
 function unzipEpub(filePath: string, outDir: string): string {
   const outputDirUrl = path.join(getBookPath(), outDir) // Crea
+
   const zip = new AdmZip(filePath)
   zip.extractAllTo(outputDirUrl, true)
   return outputDirUrl
 }
+
 async function parseEpub(outputDir: string): Promise<Book> {
+  const outputDirUrl = path.join(getBookPath(), outputDir)
   try {
-    const outputDirUrl = path.join(getBookPath(), outputDir)
     const containerPath = path.join(outputDirUrl, 'META-INF', 'container.xml')
 
     const containerData = await fs.readFile(containerPath, 'utf8')
@@ -88,10 +94,14 @@ async function parseEpub(outputDir: string): Promise<Book> {
           mediaType: manifestItem['media-type']
         }
       })
+    const store = await getBookStore(outputDir)
     return {
+      currentBookId: store.currentBookId,
+      id: md5(outputDirUrl),
       cover: (await getCoverRoute(outputDirUrl)) || '',
       spine,
-      title
+      title,
+      internalFolderName: outputDir
     }
   } catch (e) {
     if (e instanceof Error) {
@@ -99,9 +109,12 @@ async function parseEpub(outputDir: string): Promise<Book> {
     }
     console.log({ messege: 'Failed to parse epub', error: e })
     return {
+      currentBookId: 0,
+      id: md5(outputDirUrl),
       cover: '',
       spine: [],
-      title: ''
+      title: '',
+      internalFolderName: outputDir
     }
   }
 }

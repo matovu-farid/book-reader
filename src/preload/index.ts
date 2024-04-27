@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+import { updateCurrentBookId } from 'src/main/modules/epub'
 
 // Custom APIs for renderer
 const api = {}
@@ -13,7 +14,9 @@ if (process.contextIsolated) {
     contextBridge.exposeInMainWorld('api', api)
     contextBridge.exposeInMainWorld('functions', {
       getCoverImage: (filePath: string) => ipcRenderer.invoke('getCoverImage', filePath),
-      getBooks: () => ipcRenderer.invoke('getBooks')
+      getBooks: () => ipcRenderer.invoke('getBooks'),
+      updateCurrentBookId: (bookFolder: string, currentBookId: number) =>
+        ipcRenderer.invoke('updateCurrentBookId', bookFolder, currentBookId)
     })
   } catch (error) {
     console.error(error)

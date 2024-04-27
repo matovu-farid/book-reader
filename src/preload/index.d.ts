@@ -1,9 +1,5 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
-interface Book {
-  cover: string
-  spine: { idref: string; route: string; mediaType: string }[]
-  title: string
-}
+import { Book } from 'src/shared/types'
 
 declare global {
   interface Window {
@@ -12,6 +8,7 @@ declare global {
     functions: {
       getCoverImage: (filePath: string) => Promise<string | null>
       getBooks: () => Promise<Book[]>
+      updateCurrentBookId: (bookFolder: string, currentBookId: number) => Promise<void>
     }
   }
 }
