@@ -54,20 +54,36 @@ function unzipEpub(filePath: string, outDir: string): string {
   zip.extractAllTo(outputDirUrl, true)
   return outputDirUrl
 }
+export function getRouteFromRelativePath(bookFolder: string, relativePath: string) {
+  const filePath = path.resolve(getBookPath(), bookFolder, relativePath)
+  return routeFromPath(filePath) || ''
+}
+async function getManifestFiles(bookFolder: string) {
+  const absoluteBookPath = path.join(getBookPath(), bookFolder)
+  const containerPath = path.join(absoluteBookPath, 'META-INF', 'container.xml')
+  const containerData = await fs.readFile(containerPath, 'utf8')
+  const containerObj = convert.xml2js(containerData, { compact: true }) as Container
+  const opfFilePath = containerObj.container.rootfiles.rootfile._attributes['full-path']
+  const workingFolder = path.join(absoluteBookPath, path.dirname(opfFilePath))
+  const opfFileData = await fs.readFile(path.join(absoluteBookPath, opfFilePath), 'utf8')
+  const opf: OPF = convert.xml2js(opfFileData, { compact: true }) as OPF
 
-async function parseEpub(outputDir: string): Promise<Book> {
-  const outputDirUrl = path.join(getBookPath(), outputDir)
+  const opfFileObj = opf.package
+  const manifest: ManifestAttr[] = opfFileObj.manifest.item.map((item) => item._attributes)
+  return { manifest, opfFileObj, opfFilePath, workingFolder }
+}
+async function parseEpub(bookFolder: string): Promise<Book> {
+  const absoluteBookPath = path.join(getBookPath(), bookFolder)
   try {
-    const containerPath = path.join(outputDirUrl, 'META-INF', 'container.xml')
+    const { manifest, opfFileObj, opfFilePath, workingFolder } = await getManifestFiles(bookFolder)
 
-    const containerData = await fs.readFile(containerPath, 'utf8')
-    const containerObj = convert.xml2js(containerData, { compact: true }) as Container
-    const opfFilePath = containerObj.container.rootfiles.rootfile._attributes['full-path']
-    const opfFileData = await fs.readFile(path.join(outputDirUrl, opfFilePath), 'utf8')
-    const opf: OPF = convert.xml2js(opfFileData, { compact: true }) as OPF
-
-    const opfFileObj = opf.package
-    const manifest: ManifestAttr[] = opfFileObj.manifest.item.map((item) => item._attributes)
+    const cssFiles = manifest
+      .filter((fileType) => fileType['media-type'] === 'text/css')
+      .map((file) => {
+        file.href = getRouteFromRelativePath(workingFolder, file.href)
+        return file
+      })
+    console.log({ cssFiles })
 
     const manifestMap: Map<string, ManifestAttr> = new Map()
     manifest.forEach((item: ManifestAttr) => {
@@ -90,19 +106,19 @@ async function parseEpub(outputDir: string): Promise<Book> {
         }
         return {
           idref: item.idref,
-          route: routeFromPath(path.join(outputDirUrl, opfDir, manifestItem.href)) || '',
+          route: routeFromPath(path.join(absoluteBookPath, opfDir, manifestItem.href)) || '',
           mediaType: manifestItem['media-type']
         }
       })
-    const store = await getBookStore(outputDir)
+    const store = await getBookStore(bookFolder)
 
     return {
       currentBookId: store.currentBookId,
-      id: md5(outputDirUrl),
-      cover: (await getCoverRoute(outputDirUrl)) || '',
+      id: md5(absoluteBookPath),
+      cover: (await getCoverRoute(absoluteBookPath)) || '',
       spine,
       title,
-      internalFolderName: outputDir
+      internalFolderName: bookFolder
     }
   } catch (e) {
     if (e instanceof Error) {
@@ -111,14 +127,15 @@ async function parseEpub(outputDir: string): Promise<Book> {
     console.log({ messege: 'Failed to parse epub', error: e })
     return {
       currentBookId: 0,
-      id: md5(outputDirUrl),
+      id: md5(absoluteBookPath),
       cover: '',
       spine: [],
       title: '',
-      internalFolderName: outputDir
+      internalFolderName: bookFolder
     }
   }
 }
+
 export function routeFromPath(path: string): string | null {
   const regex = /public\/(.*)$/
   const match = path.match(regex)
