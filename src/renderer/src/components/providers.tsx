@@ -8,8 +8,8 @@ export const queryClient = new QueryClient()
 function Providers({ children }: PropsWithChildren): JSX.Element {
   return (
     <div>
-      <ToastContainer />
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <ToastContainer />
     </div>
   )
 }

@@ -95,6 +95,7 @@ async function parseEpub(outputDir: string): Promise<Book> {
         }
       })
     const store = await getBookStore(outputDir)
+
     return {
       currentBookId: store.currentBookId,
       id: md5(outputDirUrl),

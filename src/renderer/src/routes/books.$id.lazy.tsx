@@ -1,10 +1,10 @@
 import { ArrowBack } from '@mui/icons-material'
-import { Button } from '@mui/material'
 import Loader from '@renderer/components/Loader'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
 
 import PageView from '@renderer/components/PageView'
+import PageControls from '@renderer/components/PageControls'
 
 export const Route = createLazyFileRoute('/books/$id')({
   component: () => <BookView />
@@ -12,7 +12,6 @@ export const Route = createLazyFileRoute('/books/$id')({
 
 function BookView(): JSX.Element {
   const { id } = Route.useParams()
-  const queryClient = useQueryClient()
   const {
     isPending,
     error,
@@ -34,12 +33,6 @@ function BookView(): JSX.Element {
       return book
     }
   })
-  const updateBookId = useMutation({
-    mutationFn: async (bookId: number) => {
-      await window.functions.updateCurrentBookId(id, bookId)
-      queryClient.invalidateQueries({ queryKey: ['book'] })
-    }
-  })
 
   if (isError) return <div className="w-full h-full place-items-center grid"> {error.message}</div>
   if (isPending)
@@ -49,35 +42,14 @@ function BookView(): JSX.Element {
       </div>
     )
 
-  console.log(book)
+  //   console.log(book)
   return (
     <div>
       <div className="flex justify-between">
         <Link to="/">
           <ArrowBack />
         </Link>
-        <div className="flex gap-3">
-          <Button
-            disabled={book.currentBookId === 0}
-            onClick={() => {
-              updateBookId.mutate(Math.max(0, book.currentBookId - 1))
-            }}
-            variant="text"
-            className="disabled:invisible"
-          >
-            Back
-          </Button>
-          <Button
-            disabled={book.currentBookId === book.spine.length - 1}
-            className="disabled:invisible"
-            onClick={() => {
-              updateBookId.mutate(Math.min(book.spine.length - 1, book.currentBookId + 1))
-            }}
-            variant="text"
-          >
-            Next
-          </Button>
-        </div>
+        <PageControls book={book} />
       </div>
 
       <div>
