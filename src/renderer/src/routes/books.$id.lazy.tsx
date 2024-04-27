@@ -34,7 +34,7 @@ function BookView(): JSX.Element {
       return book
     }
   })
-  const mutation = useMutation({
+  const updateBookId = useMutation({
     mutationFn: async (bookId: number) => {
       await window.functions.updateCurrentBookId(id, bookId)
       queryClient.invalidateQueries({ queryKey: ['book'] })
@@ -60,7 +60,7 @@ function BookView(): JSX.Element {
           <Button
             disabled={book.currentBookId === 0}
             onClick={() => {
-              mutation.mutate(Math.max(0, book.currentBookId - 1))
+              updateBookId.mutate(Math.max(0, book.currentBookId - 1))
             }}
             variant="text"
             className="disabled:invisible"
@@ -71,7 +71,7 @@ function BookView(): JSX.Element {
             disabled={book.currentBookId === book.spine.length - 1}
             className="disabled:invisible"
             onClick={() => {
-              mutation.mutate(Math.min(book.spine.length - 1, book.currentBookId + 1))
+              updateBookId.mutate(Math.min(book.spine.length - 1, book.currentBookId + 1))
             }}
             variant="text"
           >

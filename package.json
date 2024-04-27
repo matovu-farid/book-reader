@@ -48,6 +48,7 @@
     "md5": "^2.3.0",
     "react-dropzone": "^14.2.3",
     "react-spinners": "^0.13.8",
+    "react-toastify": "^10.0.5",
     "react-xml-viewer": "^2.0.1",
     "serve-index": "^1.9.1",
     "serve-static": "^1.15.0",
