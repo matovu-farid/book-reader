@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback } from 'react'
+import { Suspense, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import Loader from './Loader'
 import { Link } from '@tanstack/react-router'
@@ -59,6 +59,13 @@ function FileDrop(): JSX.Element {
       {...getRootProps()}
     >
       <input {...getInputProps()} />
+      {books
+        .flatMap((book) => book.assets)
+        .flatMap((asset) => asset.css)
+        .filter((cssObj) => cssObj !== undefined)
+        .map((cssObj) => (
+          <link key={cssObj.id} rel="stylesheet" href={cssObj.href} />
+        ))}
       {isDragActive && !books ? (
         <p>Drop the files here ...</p>
       ) : books ? (

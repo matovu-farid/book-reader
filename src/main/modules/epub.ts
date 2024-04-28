@@ -1,7 +1,8 @@
 import path from 'path'
 import getEpubCover from 'get-epub-cover'
+import axios from 'axios'
 import AdmZip from 'adm-zip'
-import { app, MessageChannelMain } from 'electron'
+import { app } from 'electron'
 import { PORT } from './express'
 import md5 from 'md5'
 import convert from 'xml-js'
@@ -83,7 +84,8 @@ export async function getAssets(bookFolder: string) {
     'application/font-woff': 'font',
     'application/font-woff2': 'font',
     'application/vnd.ms-fontobject': 'font',
-    'application/font-sfnt': 'font'
+    'application/font-sfnt': 'font',
+    'application/xhtml+xml': 'xml'
   }
   const assets = Object.groupBy(manifest, (item) => {
     if (!assetTypes[item['media-type']]) {
@@ -93,22 +95,36 @@ export async function getAssets(bookFolder: string) {
   })
   delete assets['other']
 
-  Object.values(assets).forEach((value) => {
+  Object.entries(assets).forEach(([key, value]) => {
     value.forEach((file) => {
       file.href = getRouteFromRelativePath(workingFolder, file.href)
+      if (!file.properties) {
+        file.properties = {}
+      }
+      if (key === 'font') file.properties['name'] = path.basename(file.href)
+      if (key === 'xml') {
+        axios
+          .get(file.href)
+          .then((response) => {
+            const xmlString = response.data as string
+            getBookStore(bookFolder).then((store) => {
+              if (!store.imagesLinksUpdated) updateImageSrcToUrl(xmlString, path.dirname(file.href))
+            })
+          })
+          .catch((err) => {
+            const message =
+              typeof err.response !== 'undefined' ? err.response.data.message : err.message
+            console.warn('error', message)
+          })
+      }
     })
   })
 
-  // const cssFiles = manifest
-  //   .filter((fileType) => fileType['media-type'] === 'text/css')
-  //   .map((file) => {
-  //     file.href = getRouteFromRelativePath(workingFolder, file.href)
-  //     return file
-  //   })
   return assets
 }
 async function parseEpub(bookFolder: string): Promise<Book> {
   const assets = await getAssets(bookFolder)
+
   const absoluteBookPath = path.join(getBookPath(), bookFolder)
   try {
     const { manifest, opfFileObj, opfFilePath } = await getManifestFiles(bookFolder)
@@ -161,7 +177,7 @@ async function parseEpub(bookFolder: string): Promise<Book> {
       spine: [],
       title: '',
       internalFolderName: bookFolder,
-      assets: []
+      assets
     }
   }
 }
@@ -177,6 +193,7 @@ export function routeFromPath(path: string): string | null {
   const route = `http://localhost:${PORT}/${strippedFileUrl}`
   return route
 }
+
 export function getCoverRoute(outDirUrl: string): Promise<string | null> {
   return getEpubCover(outDirUrl)
     .then((path) => {
@@ -194,8 +211,26 @@ export default async function getCoverImage(filePath: string): Promise<string | 
   return getCoverRoute(outDirUrl)
 }
 
+export function updateImageSrcToUrl(html: string, bookFolder: string) {
+  const workingHtml = html
+  const regex = /<img\s[^>]*?src=["'](.*?)["'][^>]/g
+  const newHtml = workingHtml.replace(regex, (match) => {
+    const src = match.match(/src=["'](.*?)["']/)?.[1]
+    if (!src) {
+      return match
+    }
+    const route = path.join(bookFolder, src)
+    console.log(route)
+    return match.replace(src, route)
+  })
+  return newHtml
+}
+
 export async function getBooks(): Promise<Book[]> {
   const booksPaths = await fs.readdir(getBookPath())
+  // await Promise.all(
+  //   booksPaths.map(async (bookPath) => await fs.unlink(path.join(getBookPath(), bookPath)))
+  // )
 
   return Promise.all(booksPaths.map(async (bookPath) => parseEpub(bookPath)))
 }

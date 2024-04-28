@@ -2,7 +2,7 @@ export interface ManifestAttr {
   id: string
   href: string
   'media-type': string
-  properties?: string
+  properties?: Record<string, string>
 }
 
 export interface OPF {
@@ -22,7 +22,7 @@ export interface Container {
   }
 }
 
-export type Asset = 'css' | 'font' | 'other'
+export type Asset = 'css' | 'font' | 'xml' | 'other'
 export interface Book {
   currentBookId: number
   cover: string
@@ -35,4 +35,5 @@ export interface Book {
 
 export interface Store {
   currentBookId: number
+  imagesLinksUpdated: boolean
 }
