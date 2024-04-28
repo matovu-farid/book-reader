@@ -40,7 +40,7 @@ export async function getBookStore(bookFolder: string): Promise<Store> {
     .access(bookStorePath)
     .then(() => fetchBookStoreData(bookStorePath))
     .catch(() => {
-      return saveBookStore({ currentBookId: '', epubUrl: '' }, bookFolder).then(() =>
+      return saveBookStore({ currentBookId: 0, epubUrl: '' }, bookFolder).then(() =>
         fetchBookStoreData(bookStorePath)
       )
     })
@@ -175,7 +175,7 @@ async function parseEpub(bookFolder: string): Promise<Book> {
     }
     console.log({ messege: 'Failed to parse epub', error: e })
     return {
-      currentBookId: '',
+      currentBookId: 0,
       id: md5(absoluteBookPath),
       cover: '',
       spine: [],

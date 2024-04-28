@@ -8,7 +8,7 @@ declare global {
     functions: {
       getCoverImage: (filePath: string) => Promise<string | null>
       getBooks: () => Promise<Book[]>
-      updateCurrentBookId: (bookFolder: string, currentBookId: number) => Promise<void>
+      updateCurrentBookId: (bookFolder: string, currentBookId: string) => Promise<void>
     }
   }
 }

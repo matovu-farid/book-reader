@@ -24,7 +24,7 @@ export interface Container {
 
 export type Asset = 'css' | 'font' | 'xml' | 'other'
 export interface Book {
-  currentBookId: string
+  currentBookId: string | number
   cover: string
   spine: { idref: string; route: string; mediaType: string }[]
   title: string
@@ -35,6 +35,6 @@ export interface Book {
 }
 
 export interface Store {
-  currentBookId: string
+  currentBookId: string | number
   epubUrl: string
 }

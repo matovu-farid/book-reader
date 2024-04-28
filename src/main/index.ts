@@ -7,8 +7,8 @@ import getCoverImage, { getBooks, updateCurrentBookId } from './modules/epub'
 function createWindow(): void {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+    width: 1024,
+    height: 770,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -40,7 +40,7 @@ function createWindow(): void {
 function iPCHandlers(): void {
   ipcMain.handle('getCoverImage', (_, filePath) => getCoverImage(filePath))
   ipcMain.handle('getBooks', () => getBooks())
-  ipcMain.handle('updateCurrentBookId', (_, bookFolder, currentBookId) =>
+  ipcMain.handle('updateCurrentBookId', (_, bookFolder: string, currentBookId: string) =>
     updateCurrentBookId(bookFolder, currentBookId)
   )
 }
