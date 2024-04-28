@@ -1,15 +1,18 @@
-import { ArrowBack } from '@mui/icons-material'
+import ListIcon from '@mui/icons-material/List'
 import Loader from '@renderer/components/Loader'
 import { useQuery } from '@tanstack/react-query'
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
-import { IReactReaderStyle, ReactReader, ReactReaderStyle, RenditionOptionsFix } from 'react-reader'
+import { IReactReaderStyle, ReactReader, ReactReaderStyle } from 'react-reader'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-toastify'
-import PageControls from '@renderer/components/PageControls'
 import { Book } from 'src/shared/types'
 import { useEffect, useRef, useState } from 'react'
-import { Button } from '@mui/material'
+import { Button, FormControlLabel, IconButton, Radio, RadioGroup } from '@mui/material'
 import { Rendition } from 'epubjs'
+import Menu from '@mui/material/Menu'
+import MenuItem from '@mui/material/MenuItem'
+import { usePopupState, bindTrigger, bindMenu } from 'material-ui-popup-state/hooks'
+import { Label } from '@mui/icons-material'
 
 export const Route = createLazyFileRoute('/books/$id')({
   component: () => <BookView />
@@ -46,6 +49,7 @@ function BookView(): JSX.Element {
   const { id } = Route.useParams()
   const rendition = useRef<Rendition | undefined>(undefined)
   const [theme, setTheme] = useState<ITheme>('dark')
+  const popupState = usePopupState({ variant: 'popover', popupId: 'demoMenu' })
   useEffect(() => {
     if (rendition.current) {
       updateTheme(rendition.current, theme)
@@ -92,23 +96,34 @@ function BookView(): JSX.Element {
 
   //   console.log(book)
   return (
-    <div>
-      <div className="flex justify-between">
+    <div className="relative">
+      <div className="absolute right-10 top-10 z-10">
         <Link to="/">
-          <ArrowBack />
+          <Button disabled={book.currentBookId === 0} variant="text" className="disabled:invisible">
+            Back
+          </Button>
         </Link>
-        <PageControls book={book} />
+        <IconButton {...bindTrigger(popupState)}>
+          <ListIcon color="primary" />
+        </IconButton>
+        <Menu {...bindMenu(popupState)}>
+          <RadioGroup
+            aria-labelledby="demo-radio-buttons-group-label"
+            defaultValue={theme}
+            name="radio-buttons-group"
+            sx={{ padding: '10px' }}
+            onChange={(e) => {
+              setTheme(e.target.value as ITheme)
+              popupState.close()
+            }}
+          >
+            <FormControlLabel value="light" control={<Radio />} label="light" />
+            <FormControlLabel value="dark" control={<Radio />} label="dark" />
+          </RadioGroup>
+        </Menu>
       </div>
 
       <div style={{ height: '100vh' }}>
-        <div className="contents">
-          <Button onClick={() => setTheme('light')} variant="outlined">
-            Light theme
-          </Button>
-          <Button variant="outlined" onClick={() => setTheme('dark')}>
-            Dark theme
-          </Button>
-        </div>
         <ReactReader
           loadingView={
             <div className="w-full h-screen grid items-center">

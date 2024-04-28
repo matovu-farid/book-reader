@@ -58,12 +58,6 @@ function RootComponent(): JSX.Element {
           <link key={cssObj.id} rel="stylesheet" href={cssObj.href} />
         ))}
 
-      <div className="p-2 flex gap-2">
-        <Link to="/" className="[&.active]:font-bold">
-          Home
-        </Link>{' '}
-      </div>
-      <hr />
       <Outlet />
       <TanStackRouterDevtools />
     </>
