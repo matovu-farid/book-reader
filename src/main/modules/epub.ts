@@ -22,7 +22,13 @@ export async function saveBookStore(data: Store, outputDir: string): Promise<str
   return bookStorePath
 }
 
-export function fetchBookStoreData(bookStorePath: string): Promise<Store> {
+async function updateBookStore(data: Partial<Store>, outputDir: string): Promise<string> {
+  const store = await getBookStore(outputDir)
+  const updatedStore = { ...store, ...data }
+  return saveBookStore(updatedStore, outputDir)
+}
+
+function fetchBookStoreData(bookStorePath: string): Promise<Store> {
   return fs
     .readFile(bookStorePath)
     .then((data) => JSON.parse(data.toString()))
@@ -35,7 +41,7 @@ export async function getBookStore(bookFolder: string): Promise<Store> {
     .access(bookStorePath)
     .then(() => fetchBookStoreData(bookStorePath))
     .catch(() => {
-      return saveBookStore({ currentBookId: 0 }, bookFolder).then(() =>
+      return saveBookStore({ currentBookId: 0, epubUrl: '' }, bookFolder).then(() =>
         fetchBookStoreData(bookStorePath)
       )
     })
@@ -48,17 +54,27 @@ export function updateCurrentBookId(bookFolder: string, currentBookId: number): 
   })
 }
 
-function unzipEpub(filePath: string, outDir: string): string {
+async function unzipEpub(filePath: string, outDir: string): Promise<string> {
   const outputDirUrl = path.join(getBookPath(), outDir) // Crea
 
   const zip = new AdmZip(filePath)
+
   zip.extractAllTo(outputDirUrl, true)
+
+  const newZipFilePath = path.join(outputDirUrl, path.basename(filePath))
+  fs.copyFile(filePath, newZipFilePath).then(() => {
+    console.log('File was copied to destination', newZipFilePath)
+    const epubUrl = getRouteFromRelativePath(outDir, path.basename(filePath))
+
+    updateBookStore({ epubUrl }, outDir)
+  })
   return outputDirUrl
 }
 export function getRouteFromRelativePath(bookFolder: string, relativePath: string) {
   const filePath = path.resolve(getBookPath(), bookFolder, relativePath)
   return routeFromPath(filePath) || ''
 }
+
 async function getManifestFiles(bookFolder: string) {
   const absoluteBookPath = path.join(getBookPath(), bookFolder)
   const containerPath = path.join(absoluteBookPath, 'META-INF', 'container.xml')
@@ -73,7 +89,7 @@ async function getManifestFiles(bookFolder: string) {
   const manifest: ManifestAttr[] = opfFileObj.manifest.item.map((item) => item._attributes)
   return { manifest, opfFileObj, opfFilePath, workingFolder }
 }
-export async function getAssets(bookFolder: string) {
+async function getAssets(bookFolder: string) {
   const { manifest, workingFolder } = await getManifestFiles(bookFolder)
 
   const assetTypes: Record<string, Asset> = {
@@ -102,21 +118,6 @@ export async function getAssets(bookFolder: string) {
         file.properties = {}
       }
       if (key === 'font') file.properties['name'] = path.basename(file.href)
-      if (key === 'xml') {
-        axios
-          .get(file.href)
-          .then((response) => {
-            const xmlString = response.data as string
-            getBookStore(bookFolder).then((store) => {
-              if (!store.imagesLinksUpdated) updateImageSrcToUrl(xmlString, path.dirname(file.href))
-            })
-          })
-          .catch((err) => {
-            const message =
-              typeof err.response !== 'undefined' ? err.response.data.message : err.message
-            console.warn('error', message)
-          })
-      }
     })
   })
 
@@ -124,6 +125,8 @@ export async function getAssets(bookFolder: string) {
 }
 async function parseEpub(bookFolder: string): Promise<Book> {
   const assets = await getAssets(bookFolder)
+
+  const store = await getBookStore(bookFolder).catch(() => ({ currentBookId: 0, epubUrl: '' }))
 
   const absoluteBookPath = path.join(getBookPath(), bookFolder)
   try {
@@ -154,8 +157,9 @@ async function parseEpub(bookFolder: string): Promise<Book> {
           mediaType: manifestItem['media-type']
         }
       })
-    const store = await getBookStore(bookFolder)
+    // await updateSpineImageUrls(spine, bookFolder)
 
+    const store = await getBookStore(bookFolder)
     return {
       currentBookId: store.currentBookId,
       id: md5(absoluteBookPath),
@@ -163,7 +167,8 @@ async function parseEpub(bookFolder: string): Promise<Book> {
       spine,
       title,
       internalFolderName: bookFolder,
-      assets
+      assets,
+      epubUrl: store.epubUrl
     }
   } catch (e) {
     if (e instanceof Error) {
@@ -177,8 +182,34 @@ async function parseEpub(bookFolder: string): Promise<Book> {
       spine: [],
       title: '',
       internalFolderName: bookFolder,
-      assets
+      assets,
+      epubUrl: store.epubUrl
     }
+  }
+}
+
+async function updateSpineImageUrls(
+  spine: { idref: string; route: string; mediaType: string }[],
+  bookFolder: string
+): Promise<void> {
+  spine.forEach((item) => {
+    updateImageXML(item, bookFolder)
+  })
+}
+
+async function updateImageXML(
+  item: { idref: string; route: string; mediaType: string },
+  bookFolder: string
+): Promise<void> {
+  try {
+    const response = await axios.get(item.route, { responseType: 'text' })
+
+    const xmlString = JSON.stringify(response.data)
+    const store = await getBookStore(bookFolder)
+
+    // if (!store.imagesLinksUpdated) updateImageSrcToUrl(xmlString, path.dirname(item.route))
+  } catch (e) {
+    console.warn('error', e)
   }
 }
 
@@ -206,12 +237,12 @@ export function getCoverRoute(outDirUrl: string): Promise<string | null> {
 }
 export default async function getCoverImage(filePath: string): Promise<string | null> {
   const outDir = md5(filePath)
-  const outDirUrl = unzipEpub(filePath, outDir)
+  const outDirUrl = await unzipEpub(filePath, outDir)
 
   return getCoverRoute(outDirUrl)
 }
 
-export function updateImageSrcToUrl(html: string, bookFolder: string) {
+function updateImageSrcToUrl(html: string, bookFolder: string) {
   const workingHtml = html
   const regex = /<img\s[^>]*?src=["'](.*?)["'][^>]/g
   const newHtml = workingHtml.replace(regex, (match) => {
@@ -228,9 +259,8 @@ export function updateImageSrcToUrl(html: string, bookFolder: string) {
 
 export async function getBooks(): Promise<Book[]> {
   const booksPaths = await fs.readdir(getBookPath())
-  // await Promise.all(
-  //   booksPaths.map(async (bookPath) => await fs.unlink(path.join(getBookPath(), bookPath)))
-  // )
+  // await fs.chown(getBookPath(), 1000, 1000)
+  // await fs.rmdir(getBookPath())
 
   return Promise.all(booksPaths.map(async (bookPath) => parseEpub(bookPath)))
 }

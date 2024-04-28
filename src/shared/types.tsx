@@ -31,9 +31,10 @@ export interface Book {
   id: string
   internalFolderName: string
   assets: Partial<Record<Asset, ManifestAttr[]>>
+  epubUrl: string
 }
 
 export interface Store {
-  currentBookId: number
-  imagesLinksUpdated: boolean
+  currentBookId: string
+  epubUrl: string
 }

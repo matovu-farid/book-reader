@@ -2,9 +2,10 @@ import { ArrowBack } from '@mui/icons-material'
 import Loader from '@renderer/components/Loader'
 import { useQuery } from '@tanstack/react-query'
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
-
+import { ReactReader } from 'react-reader'
 import PageView from '@renderer/components/PageView'
 import PageControls from '@renderer/components/PageControls'
+import { useState } from 'react'
 
 export const Route = createLazyFileRoute('/books/$id')({
   component: () => <BookView />
@@ -12,6 +13,7 @@ export const Route = createLazyFileRoute('/books/$id')({
 
 function BookView(): JSX.Element {
   const { id } = Route.useParams()
+  const [location, setLocation] = useState<string | number>(0)
   const {
     isPending,
     error,
@@ -21,14 +23,8 @@ function BookView(): JSX.Element {
     queryKey: ['book'],
     queryFn: async () => {
       const books = await window.functions.getBooks()
-      const book = books.find((book) => book.id === id) || {
-        id: '',
-        title: '',
-        cover: '',
-        spine: [],
-        internalFolderName: '',
-        currentBookId: 0
-      }
+      const book = books.find((book) => book.id === id)
+      if (!book) throw new Error('Book not found')
 
       return book
     }
@@ -52,8 +48,16 @@ function BookView(): JSX.Element {
         <PageControls book={book} />
       </div>
 
-      <div>
-        <PageView book={book} />
+      <div style={{ height: '100vh' }}>
+        <ReactReader
+          url={book.epubUrl}
+          location={location}
+          locationChanged={(epubcfi: string) => {
+            console.log({ epubcfi })
+            setLocation(epubcfi)
+          }}
+          swipeable={true}
+        />
       </div>
     </div>
   )
