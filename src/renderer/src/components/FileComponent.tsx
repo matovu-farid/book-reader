@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Suspense, useCallback } from 'react'
+import { useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import Loader from './Loader'
 import { Link } from '@tanstack/react-router'
@@ -52,13 +52,13 @@ function FileDrop(): JSX.Element {
           : {}
       }
       className={
-        books
-          ? 'border-gray-500 border min-w-[100vw] min-h-[100vh] '
-          : 'border-gray-500 border grid place-items-center rounded-3xl w-[50vw] h-[50vh]'
+        books.length > 0
+          ? ' w-full h-screen p-5'
+          : ' grid place-items-center rounded-3xl w-[50vw] h-[50vh] p-5'
       }
       {...getRootProps()}
     >
-      <input {...getInputProps()} />
+      <input {...getInputProps()} className="p-5" />
       {books
         .flatMap((book) => book.assets)
         .flatMap((asset) => asset.css)

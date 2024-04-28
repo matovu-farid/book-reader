@@ -1,10 +1,7 @@
-import React from 'react'
 import Loader from '@renderer/components/Loader'
 import { useQuery } from '@tanstack/react-query'
-import { createRootRoute, Link, Outlet } from '@tanstack/react-router'
+import { createRootRoute, Outlet } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/router-devtools'
-import { createGlobalStyle } from 'styled-components'
-import { Book } from 'src/shared/types'
 
 export const Route = createRootRoute({
   component: () => <RootComponent />
@@ -29,27 +26,9 @@ function RootComponent(): JSX.Element {
       </div>
     )
 
-  const GlobalFonts = createGlobalStyle`
- 
-  ${books && createStyles(books)}
-`
-  function createStyles(books: Book[]) {
-    return books
-      .flatMap((book) => book.assets)
-      .flatMap((asset) => asset.font)
-      .filter((font) => font !== undefined)
-      .map((font) => {
-        console.log(font)
-        const fontFace = `@font-face {
-            font-family: '${font.properties['name'] || 'font'}';
-            src: url('${font.href}')');
-          }`
-        return fontFace
-      })
-  }
   return (
     <>
-      <GlobalFonts />
+      {/* <GlobalFonts /> */}
       {books
         .flatMap((book) => book.assets)
         .flatMap((asset) => asset.css)
