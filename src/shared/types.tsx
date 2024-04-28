@@ -24,7 +24,7 @@ export interface Container {
 
 export type Asset = 'css' | 'font' | 'xml' | 'other'
 export interface Book {
-  currentBookId: number
+  currentBookId: string
   cover: string
   spine: { idref: string; route: string; mediaType: string }[]
   title: string

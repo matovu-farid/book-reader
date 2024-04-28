@@ -1,6 +1,5 @@
 import path from 'path'
 import getEpubCover from 'get-epub-cover'
-import axios from 'axios'
 import AdmZip from 'adm-zip'
 import { app } from 'electron'
 import { PORT } from './express'
@@ -41,13 +40,13 @@ export async function getBookStore(bookFolder: string): Promise<Store> {
     .access(bookStorePath)
     .then(() => fetchBookStoreData(bookStorePath))
     .catch(() => {
-      return saveBookStore({ currentBookId: 0, epubUrl: '' }, bookFolder).then(() =>
+      return saveBookStore({ currentBookId: '', epubUrl: '' }, bookFolder).then(() =>
         fetchBookStoreData(bookStorePath)
       )
     })
 }
 
-export function updateCurrentBookId(bookFolder: string, currentBookId: number): Promise<string> {
+export function updateCurrentBookId(bookFolder: string, currentBookId: string): Promise<string> {
   return getBookStore(bookFolder).then((store) => {
     store.currentBookId = currentBookId
     return saveBookStore(store, bookFolder)
@@ -176,7 +175,7 @@ async function parseEpub(bookFolder: string): Promise<Book> {
     }
     console.log({ messege: 'Failed to parse epub', error: e })
     return {
-      currentBookId: 0,
+      currentBookId: '',
       id: md5(absoluteBookPath),
       cover: '',
       spine: [],
@@ -185,31 +184,6 @@ async function parseEpub(bookFolder: string): Promise<Book> {
       assets,
       epubUrl: store.epubUrl
     }
-  }
-}
-
-async function updateSpineImageUrls(
-  spine: { idref: string; route: string; mediaType: string }[],
-  bookFolder: string
-): Promise<void> {
-  spine.forEach((item) => {
-    updateImageXML(item, bookFolder)
-  })
-}
-
-async function updateImageXML(
-  item: { idref: string; route: string; mediaType: string },
-  bookFolder: string
-): Promise<void> {
-  try {
-    const response = await axios.get(item.route, { responseType: 'text' })
-
-    const xmlString = JSON.stringify(response.data)
-    const store = await getBookStore(bookFolder)
-
-    // if (!store.imagesLinksUpdated) updateImageSrcToUrl(xmlString, path.dirname(item.route))
-  } catch (e) {
-    console.warn('error', e)
   }
 }
 
@@ -240,21 +214,6 @@ export default async function getCoverImage(filePath: string): Promise<string | 
   const outDirUrl = await unzipEpub(filePath, outDir)
 
   return getCoverRoute(outDirUrl)
-}
-
-function updateImageSrcToUrl(html: string, bookFolder: string) {
-  const workingHtml = html
-  const regex = /<img\s[^>]*?src=["'](.*?)["'][^>]/g
-  const newHtml = workingHtml.replace(regex, (match) => {
-    const src = match.match(/src=["'](.*?)["']/)?.[1]
-    if (!src) {
-      return match
-    }
-    const route = path.join(bookFolder, src)
-    console.log(route)
-    return match.replace(src, route)
-  })
-  return newHtml
 }
 
 export async function getBooks(): Promise<Book[]> {
