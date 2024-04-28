@@ -18,7 +18,8 @@ function RootComponent(): JSX.Element {
     queryFn: () => window.functions.getBooks()
   })
 
-  if (isError) return <div className="w-full h-full place-items-center grid"> {error.message}</div>
+  if (isError)
+    return <div className="w-full h-screen place-items-center grid"> {error.message}</div>
   if (isPending)
     return (
       <div className="w-full h-screen place-items-center grid">

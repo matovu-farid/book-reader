@@ -9,6 +9,7 @@ function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: 1024,
     height: 770,
+    title: 'Rishi',
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -58,9 +59,6 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
   iPCHandlers()
-
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
 
   createWindow()
 

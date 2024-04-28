@@ -1,4 +1,4 @@
-import { ReaderTheme } from "./commonReader"
+import { ReaderTheme } from './commonReader'
 
 export enum ThemeType {
   White = 'white',
@@ -7,7 +7,6 @@ export enum ThemeType {
 }
 export interface Theme {
   background: string
-  color: string,
+  color: string
   readerTheme: ReaderTheme
 }
-

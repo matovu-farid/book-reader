@@ -1,4 +1,3 @@
-import ListIcon from '@mui/icons-material/List'
 import Loader from '@renderer/components/Loader'
 import { useQuery } from '@tanstack/react-query'
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
@@ -15,6 +14,7 @@ import { ThemeType } from '@renderer/themes/common'
 import { themes } from '@renderer/themes/themes'
 import createIReactReaderTheme from '@renderer/themes/readerThemes'
 import { ThemeProvider, THEME_ID, createTheme } from '@mui/material/styles'
+import PaletteIcon from '@mui/icons-material/Palette'
 
 export const Route = createLazyFileRoute('/books/$id')({
   component: () => <BookView />
@@ -55,7 +55,20 @@ function BookView(): JSX.Element {
   const materialTheme = createTheme({
     palette: {
       primary: {
-        main: themes[theme].color
+        main: themes[theme].color,
+        contrastText: themes[theme].background
+      }
+    },
+    components: {
+      MuiMenu: {
+        styleOverrides: {
+          list: {
+            '&[role="menu"]': {
+              backgroundColor: themes[theme].background,
+              color: themes[theme].color
+            }
+          }
+        }
       }
     }
   })
@@ -98,7 +111,7 @@ function BookView(): JSX.Element {
             </Button>
           </Link>
           <IconButton {...bindTrigger(popupState)}>
-            <ListIcon color="primary" />
+            <PaletteIcon color="primary" />
           </IconButton>
           <Menu {...bindMenu(popupState)}>
             <RadioGroup
