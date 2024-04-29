@@ -5,7 +5,7 @@ import Loader from './Loader'
 import { Link } from '@tanstack/react-router'
 import { Book } from 'src/shared/types'
 import { toast } from 'react-toastify'
-import { Button, IconButton } from '@mui/material'
+import { IconButton } from '@mui/material'
 import CancelIcon from '@mui/icons-material/Cancel'
 
 function FileDrop(): JSX.Element {
@@ -68,12 +68,12 @@ function FileDrop(): JSX.Element {
       }
       className={
         books.length > 0
-          ? ' w-full h-screen p-5  gap-[30px] place-items-baseline'
+          ? ' w-full h-screen p-5  gap-[30px] place-items-baseline  cursor-pointer'
           : ' grid place-items-center gap-3 rounded-3xl w-[50vw] h-[50vh] p-5'
       }
       {...getRootProps()}
     >
-      <input {...getInputProps()} className="p-5" />
+      <input {...getInputProps()} className="p-5 cursor-pointer" />
       {books
         .flatMap((book) => book.assets)
         .flatMap((asset) => asset.css)
@@ -86,14 +86,14 @@ function FileDrop(): JSX.Element {
       ) : books ? (
         books.map((book, idx) => (
           <div key={idx + book.cover} className="p-2 grid relative">
-            <Button
+            <div
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
               }}
               className="rounded-3xl  bg-transparent  "
             >
-              <div className="absolute -top-3 -right-3">
+              <div className="absolute -top-4 -right-4">
                 <IconButton
                   onClick={() => {
                     deleteBook.mutate({ book })
@@ -110,7 +110,7 @@ function FileDrop(): JSX.Element {
               >
                 <img className="object-fill" src={book.cover} width={200} alt="cover image" />
               </Link>
-            </Button>
+            </div>
             <div className="text-teal-500 justify-center p-2 overflow-hidden text-ellipsis whitespace-nowrap text-sm">
               {book.title}
             </div>
