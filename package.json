@@ -41,6 +41,7 @@
     "axios": "^1.6.8",
     "cors": "^2.8.5",
     "dompurify": "^3.1.1",
+    "epub-check": "^0.3.0",
     "epub-metadata-parser": "^1.1.14",
     "epubjs": "^0.3.93",
     "express": "^4.19.2",

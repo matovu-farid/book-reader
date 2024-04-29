@@ -6,7 +6,7 @@ import md5 from 'md5'
 import convert from 'xml-js'
 import fs from 'fs/promises'
 import type { Book, ManifestAttr, OPF, Container, Store, Asset } from '../../shared/types'
-import { filetypename } from 'magic-bytes.js'
+import { filetypemime, filetypename } from 'magic-bytes.js'
 
 export function getBookPath(): string {
   try {
@@ -242,13 +242,18 @@ export async function getCoverRoute(bookFolder: string): Promise<string | null> 
     return null
   }
 }
+
 export default async function getCoverImage(filePath: string): Promise<string | null> {
   try {
     const outDir = md5(filePath)
     const file = await fs.readFile(filePath)
     const types = filetypename(file)
-    const isEpub = types.some((type) => type === 'epub')
-    if (!isEpub) return null
+    const mimes = filetypemime(file)
+    const isEpubOrZip = types.some((type) => type === 'epub' || type === 'zip')
+    if (!isEpubOrZip) {
+      console.log({ types, mimes })
+      return null
+    }
     await unzipEpub(filePath, outDir)
 
     return getCoverRoute(outDir)
