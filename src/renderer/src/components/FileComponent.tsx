@@ -22,7 +22,6 @@ function FileDrop(): JSX.Element {
         console.error('Invalid file type')
         return
       }
-      console.log({ path: file.path })
       const coverImage = await window.functions.getCoverImage(file.path)
       if (coverImage === null) {
         console.error('Failed to get cover image')
@@ -53,7 +52,7 @@ function FileDrop(): JSX.Element {
       }
       className={
         books.length > 0
-          ? ' w-full h-screen p-5'
+          ? ' w-full h-screen p-5 place-items-baseline'
           : ' grid place-items-center rounded-3xl w-[50vw] h-[50vh] p-5'
       }
       {...getRootProps()}
@@ -70,7 +69,7 @@ function FileDrop(): JSX.Element {
         <p>Drop the files here ...</p>
       ) : books ? (
         books.map((book, idx) => (
-          <div key={idx + book.cover} className="p-2 ">
+          <div key={idx + book.cover} className="p-2 grid ">
             <button
               onClick={(e) => {
                 e.preventDefault()
@@ -83,7 +82,7 @@ function FileDrop(): JSX.Element {
                 params={{ id: book.id }}
                 className="rounded-3xl bg-transparent shadow-2xl overflow-hidden"
               >
-                <img className="object-fill" src={book.cover} width={150} alt="cover image" />
+                <img className="object-fill" src={book.cover} width={165} alt="cover image" />
               </Link>
             </button>
             <div className="text-teal-500 justify-center p-2 overflow-hidden text-ellipsis whitespace-nowrap text-sm">

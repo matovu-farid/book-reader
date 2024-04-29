@@ -96,7 +96,6 @@ function BookView(): JSX.Element {
       </div>
     )
 
-  //   console.log(book)
   return (
     <ThemeProvider theme={{ [THEME_ID]: materialTheme }}>
       <div className="relative">
