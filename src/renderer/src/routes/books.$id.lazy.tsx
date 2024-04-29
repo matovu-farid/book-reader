@@ -149,9 +149,6 @@ function BookView(): JSX.Element {
               updateTheme(_rendition, theme)
               rendition.current = _rendition
             }}
-            epubInitOptions={{
-              openAs: 'epub'
-            }}
           />
         </div>
       </div>

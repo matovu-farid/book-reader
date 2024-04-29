@@ -32,18 +32,26 @@ function FileDrop(): JSX.Element {
       queryClient.invalidateQueries({ queryKey: ['books'] })
     }
   })
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    acceptedFiles.forEach(async (file) => {
-      if (file.type !== 'application/epub+zip') {
-        console.error('Invalid file type')
-        return
-      }
+  const getCoverImage = useMutation({
+    mutationFn: async ({ file }: { file: File }) => {
       const coverImage = await window.functions.getCoverImage(file.path)
       if (coverImage === null) {
-        console.error('Failed to get cover image')
-        return
+        throw new Error('Failed to get cover image')
       }
+      return coverImage
+    },
+
+    onError(error) {
+      toast.error("Can't upload book")
+      console.log({ error })
+    },
+    async onSuccess() {
       queryClient.invalidateQueries({ queryKey: ['books'] })
+    }
+  })
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    acceptedFiles.forEach((file) => {
+      getCoverImage.mutate({ file })
     })
   }, [])
 

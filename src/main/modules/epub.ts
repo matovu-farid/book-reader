@@ -1,5 +1,4 @@
 import path from 'path'
-import getEpubCover from 'get-epub-cover'
 import AdmZip from 'adm-zip'
 import { app } from 'electron'
 import { PORT } from './express'
@@ -7,11 +6,43 @@ import md5 from 'md5'
 import convert from 'xml-js'
 import fs from 'fs/promises'
 import type { Book, ManifestAttr, OPF, Container, Store, Asset } from '../../shared/types'
+import { filetypename } from 'magic-bytes.js'
 
 export function getBookPath(): string {
-  const bookPath = path.join(app.getPath('appData'), 'public', 'books')
-  fs.access(bookPath).catch(() => fs.mkdir(bookPath, { recursive: true }))
-  return bookPath
+  try {
+    const bookPath = path.join(app.getPath('appData'), 'public', 'books')
+    fs.access(bookPath).catch(() => fs.mkdir(bookPath, { recursive: true }))
+    return bookPath
+  } catch (e) {
+    console.log(e)
+    return ''
+  }
+}
+
+async function getEpubCover(bookFolder: string) {
+  const { opfFileObj } = await getManifestFiles(bookFolder)
+  // Try to find the cover by checking the 'properties' attribute or the id
+  const coverItem = opfFileObj.manifest.item.find(
+    (item) =>
+      (item._attributes['media-type'] === 'image/jpeg' ||
+        item._attributes['media-type'] === 'image/png') &&
+      (item._attributes.properties?.['cover-image'] ||
+        item._attributes.id.toLowerCase().includes('cover'))
+  )
+
+  if (coverItem) {
+    return coverItem._attributes.href
+  }
+
+  // No cover found with specific properties or id hints, checking by file name
+  const likelyCover = opfFileObj.manifest.item.find(
+    (item) =>
+      item._attributes.href.toLowerCase().includes('cover') &&
+      (item._attributes['media-type'] === 'image/jpeg' ||
+        item._attributes['media-type'] === 'image/png')
+  )
+
+  return likelyCover ? likelyCover._attributes.href : ''
 }
 
 export async function saveBookStore(data: Store, outputDir: string): Promise<string> {
@@ -123,12 +154,12 @@ async function getAssets(bookFolder: string) {
   return assets
 }
 async function parseEpub(bookFolder: string): Promise<Book> {
-  const assets = await getAssets(bookFolder)
-
-  const store = await getBookStore(bookFolder).catch(() => ({ currentBookId: 0, epubUrl: '' }))
-
-  const absoluteBookPath = path.join(getBookPath(), bookFolder)
   try {
+    const assets = await getAssets(bookFolder)
+
+    const store = await getBookStore(bookFolder).catch(() => ({ currentBookId: 0, epubUrl: '' }))
+
+    const absoluteBookPath = path.join(getBookPath(), bookFolder)
     const { manifest, opfFileObj, opfFilePath } = await getManifestFiles(bookFolder)
 
     const manifestMap: Map<string, ManifestAttr> = new Map()
@@ -158,11 +189,10 @@ async function parseEpub(bookFolder: string): Promise<Book> {
       })
     // await updateSpineImageUrls(spine, bookFolder)
 
-    const store = await getBookStore(bookFolder)
     return {
       currentBookId: store.currentBookId,
       id: md5(absoluteBookPath),
-      cover: (await getCoverRoute(absoluteBookPath)) || '',
+      cover: (await getCoverRoute(bookFolder)) || '',
       spine,
       title,
       internalFolderName: bookFolder,
@@ -176,13 +206,13 @@ async function parseEpub(bookFolder: string): Promise<Book> {
     console.log({ messege: 'Failed to parse epub', error: e })
     return {
       currentBookId: 0,
-      id: md5(absoluteBookPath),
+      id: '',
       cover: '',
       spine: [],
       title: '',
       internalFolderName: bookFolder,
-      assets,
-      epubUrl: store.epubUrl
+      assets: {},
+      epubUrl: ''
     }
   }
 }
@@ -199,21 +229,33 @@ export function routeFromPath(path: string): string | null {
   return route
 }
 
-export function getCoverRoute(outDirUrl: string): Promise<string | null> {
-  return getEpubCover(outDirUrl)
-    .then((path) => {
-      return routeFromPath(path)
-    })
-    .catch((err) => {
-      console.log('Failed to get cover image', err)
-      return null
-    })
+export async function getCoverRoute(bookFolder: string): Promise<string | null> {
+  try {
+    const cover = await getEpubCover(bookFolder)
+
+    if (!cover) return ''
+    const { workingFolder } = await getManifestFiles(bookFolder)
+    const coverHref = getRouteFromRelativePath(workingFolder, cover)
+    return coverHref
+  } catch (error) {
+    console.log('Failed to get cover image', error)
+    return null
+  }
 }
 export default async function getCoverImage(filePath: string): Promise<string | null> {
-  const outDir = md5(filePath)
-  const outDirUrl = await unzipEpub(filePath, outDir)
+  try {
+    const outDir = md5(filePath)
+    const file = await fs.readFile(filePath)
+    const types = filetypename(file)
+    const isEpub = types.some((type) => type === 'epub')
+    if (!isEpub) return null
+    await unzipEpub(filePath, outDir)
 
-  return getCoverRoute(outDirUrl)
+    return getCoverRoute(outDir)
+  } catch (e) {
+    console.log(e)
+    return null
+  }
 }
 
 // function to delete a book from a book folder
