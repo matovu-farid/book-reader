@@ -2,7 +2,7 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import getCoverImage, { getBooks, updateCurrentBookId } from './modules/epub'
+import getCoverImage, { deleteBook, getBooks, updateCurrentBookId } from './modules/epub'
 
 function createWindow(): void {
   // Create the browser window.
@@ -44,6 +44,7 @@ function iPCHandlers(): void {
   ipcMain.handle('updateCurrentBookId', (_, bookFolder: string, currentBookId: string) =>
     updateCurrentBookId(bookFolder, currentBookId)
   )
+  ipcMain.handle('deleteBook', (_, bookFolder: string) => deleteBook(bookFolder))
 }
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.

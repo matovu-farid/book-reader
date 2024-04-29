@@ -216,6 +216,12 @@ export default async function getCoverImage(filePath: string): Promise<string | 
   return getCoverRoute(outDirUrl)
 }
 
+// function to delete a book from a book folder
+export async function deleteBook(bookFolder: string): Promise<void> {
+  const bookPath = path.join(getBookPath(), bookFolder)
+  await fs.rmdir(bookPath, { recursive: true })
+}
+
 export async function getBooks(): Promise<Book[]> {
   const booksPaths = await fs.readdir(getBookPath())
   // await fs.chown(getBookPath(), 1000, 1000)

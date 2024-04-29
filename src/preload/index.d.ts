@@ -9,6 +9,7 @@ declare global {
       getCoverImage: (filePath: string) => Promise<string | null>
       getBooks: () => Promise<Book[]>
       updateCurrentBookId: (bookFolder: string, currentBookId: string) => Promise<void>
+      deleteBook: (bookFolder: string) => Promise<void>
     }
   }
 }
