@@ -4,10 +4,9 @@ import serveIndex from 'serve-index'
 import serveStatic from 'serve-static'
 import { app as electronApp } from 'electron'
 import cors from 'cors'
+import { PORT } from './PORT'
 
 const app = express()
-
-export const PORT = 3495
 
 // Directory containing the files you want to serve
 const publicDirectoryPath = () => path.join(electronApp.getPath('appData'), 'public') // Crea

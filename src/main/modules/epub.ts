@@ -6,9 +6,10 @@ import convert from 'xml-js'
 import fs from 'fs/promises'
 import type { Book, ManifestAttr, OPF, Container, Store } from '../../shared/types'
 import { filetypemime, filetypename } from 'magic-bytes.js'
-import { classifyAssets } from './classifyAssets'
 import { routeFromPath } from './routeFromPath'
-import { PORT } from './express'
+import { PORT } from './PORT'
+import { getAssets } from './getAssets'
+import { getRouteFromRelativePath } from './getRouteFromRelativePath'
 
 export async function getCoverImage(filePath: string): Promise<string | null> {
   try {
@@ -25,7 +26,7 @@ export async function getCoverImage(filePath: string): Promise<string | null> {
     const cover = await getEpubCover(bookFolder)
     const { workingFolder } = await getManifestFiles(bookFolder)
 
-    return getCoverRoute(cover, workingFolder)
+    return getRouteFromRelativePath(workingFolder, cover)
   } catch (e) {
     console.log(e)
     return null
@@ -52,7 +53,7 @@ export async function getBooks(): Promise<Book[]> {
   return Promise.all(booksPaths.map(async (bookPath) => parseEpub(bookPath)))
 }
 
-function getBookPath(): string {
+export function getBookPath(): string {
   try {
     const bookPath = path.join(app.getPath('appData'), 'public', 'books')
     fs.access(bookPath).catch(() => fs.mkdir(bookPath, { recursive: true }))
@@ -137,11 +138,6 @@ export async function unzipEpub(filePath: string, outDir: string): Promise<strin
   })
   return outputDirUrl
 }
-function getRouteFromRelativePath(bookFolder: string, relativePath: string) {
-  const filePath = path.resolve(getBookPath(), bookFolder, relativePath)
-  return routeFromPath(filePath, PORT) || ''
-}
-
 async function getManifestFiles(bookFolder: string) {
   const absoluteBookPath = path.join(getBookPath(), bookFolder)
   const containerPath = path.join(absoluteBookPath, 'META-INF', 'container.xml')
@@ -156,32 +152,14 @@ async function getManifestFiles(bookFolder: string) {
   const manifest: ManifestAttr[] = opfFileObj.manifest.item.map((item) => item._attributes)
   return { manifest, opfFileObj, opfFilePath, workingFolder }
 }
-async function getAssets(bookFolder: string) {
-  const { manifest, workingFolder } = await getManifestFiles(bookFolder)
-
-  const assets = classifyAssets(manifest)
-  delete assets['other']
-
-  Object.entries(assets).forEach(([key, value]) => {
-    value.forEach((file) => {
-      file.href = getRouteFromRelativePath(workingFolder, file.href)
-      if (!file.properties) {
-        file.properties = {}
-      }
-      if (key === 'font') file.properties['name'] = path.basename(file.href)
-    })
-  })
-
-  return assets
-}
 async function parseEpub(bookFolder: string): Promise<Book> {
   try {
-    const assets = await getAssets(bookFolder)
+    const { manifest, workingFolder, opfFileObj, opfFilePath } = await getManifestFiles(bookFolder)
+    const assets = await getAssets(manifest, workingFolder)
 
     const store = await getBookStore(bookFolder).catch(() => ({ currentBookId: 0, epubUrl: '' }))
 
     const absoluteBookPath = path.join(getBookPath(), bookFolder)
-    const { manifest, opfFileObj, opfFilePath } = await getManifestFiles(bookFolder)
 
     const manifestMap: Map<string, ManifestAttr> = new Map()
     manifest.forEach((item: ManifestAttr) => {
@@ -202,19 +180,19 @@ async function parseEpub(bookFolder: string): Promise<Book> {
             mediaType: ''
           }
         }
+        const regex = /public\/(.*)$/
         return {
           idref: item.idref,
-          route: routeFromPath(path.join(absoluteBookPath, opfDir, manifestItem.href), PORT) || '',
+          route: routeFromPath(path.join(absoluteBookPath, opfDir, manifestItem.href), PORT, regex) || '',
           mediaType: manifestItem['media-type']
         }
       })
     // await updateSpineImageUrls(spine, bookFolder)
     const cover = await getEpubCover(bookFolder)
-    const { workingFolder } = await getManifestFiles(bookFolder)
     return {
       currentBookId: store.currentBookId,
       id: md5(absoluteBookPath),
-      cover: (await getCoverRoute(cover, workingFolder)) || '',
+      cover: getRouteFromRelativePath(workingFolder, cover) || '',
       spine,
       title,
       internalFolderName: bookFolder,
@@ -236,15 +214,5 @@ async function parseEpub(bookFolder: string): Promise<Book> {
       assets: {},
       epubUrl: ''
     }
-  }
-}
-
-export async function getCoverRoute(cover: string, workingFolder: string): Promise<string | null> {
-  try {
-    const coverHref = getRouteFromRelativePath(workingFolder, cover)
-    return coverHref
-  } catch (error) {
-    console.log('Failed to get cover image', error)
-    return null
   }
 }
