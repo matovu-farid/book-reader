@@ -2,7 +2,8 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { getCoverImage, deleteBook, getBooks, updateCurrentBookId } from './modules/epub'
+import { deleteBook, getBooks, updateCurrentBookId } from './modules/epub'
+import { getCoverImage } from './modules/getCoverImage'
 import './modules/express'
 
 function createWindow(): void {
