@@ -1,14 +1,27 @@
-import { PUBLIC } from 'src/main/modules/epub_constants'
+import { app } from 'electron'
+import { BOOKS, PUBLIC } from 'src/main/modules/epub_constants'
 import { getAssets } from 'src/main/modules/getAssets'
 import { PORT } from 'src/main/modules/PORT'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+
+vi.mock('electron', () => ({
+  app: {
+    getPath: vi.fn(() => 'appData')
+  }
+}))
+vi.mock('fs/promises', async () => ({
+  ...(await vi.importActual('fs/promises')),
+  mkdir: vi.fn(),
+  access: vi.fn()
+}))
 
 describe('getAssets', () => {
   it('should return assets', async () => {
+    vi.mocked(app.getPath).mockReturnValue('appData')
     const manifest = [
       {
         id: 'id',
-        href: `${PUBLIC}/href`,
+        href: `href`,
         'media-type': 'text/css'
       }
     ]
@@ -19,7 +32,7 @@ describe('getAssets', () => {
       css: [
         {
           id: 'id',
-          href: `http://localhost:${PORT}/href`,
+          href: `http://localhost:${PORT}/${BOOKS}/${workingFolder}/href`,
           'media-type': 'text/css',
           properties: {}
         }

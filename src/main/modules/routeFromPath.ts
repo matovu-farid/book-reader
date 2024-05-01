@@ -1,4 +1,4 @@
-export function routeFromPath(path: string, port: number, regex:RegExp): string | null {
+export function routeFromPath(path: string, port: number, regex: RegExp): string | null {
   const match = path.match(regex)
   if (!match) {
     return null
