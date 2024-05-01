@@ -10,6 +10,7 @@ import { routeFromPath } from './routeFromPath'
 import { PORT } from './PORT'
 import { getAssets } from './getAssets'
 import { getRouteFromRelativePath } from './getRouteFromRelativePath'
+import { BOOKS, PUBLIC } from './epub_constants'
 
 export async function getCoverImage(filePath: string): Promise<string | null> {
   try {
@@ -55,7 +56,7 @@ export async function getBooks(): Promise<Book[]> {
 
 export function getBookPath(): string {
   try {
-    const bookPath = path.join(app.getPath('appData'), 'public', 'books')
+    const bookPath = path.join(app.getPath('appData'), PUBLIC, BOOKS)
     fs.access(bookPath).catch(() => fs.mkdir(bookPath, { recursive: true }))
     return bookPath
   } catch (e) {
@@ -183,7 +184,9 @@ async function parseEpub(bookFolder: string): Promise<Book> {
         const regex = /public\/(.*)$/
         return {
           idref: item.idref,
-          route: routeFromPath(path.join(absoluteBookPath, opfDir, manifestItem.href), PORT, regex) || '',
+          route:
+            routeFromPath(path.join(absoluteBookPath, opfDir, manifestItem.href), PORT, regex) ||
+            '',
           mediaType: manifestItem['media-type']
         }
       })

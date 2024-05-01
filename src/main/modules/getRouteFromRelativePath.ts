@@ -3,8 +3,12 @@ import { routeFromPath } from './routeFromPath'
 import { PORT } from './PORT'
 import { getBookPath } from './epub'
 
-export function getRouteFromRelativePath(bookFolder: string, relativePath: string) {
+export function getRouteFromRelativePath(
+  bookFolder: string,
+  relativePath: string,
+  regex = /public\/(.*)$/
+) {
   const filePath = path.resolve(getBookPath(), bookFolder, relativePath)
-  const regex = /public\/(.*)$/
+
   return routeFromPath(filePath, PORT, regex) || ''
 }

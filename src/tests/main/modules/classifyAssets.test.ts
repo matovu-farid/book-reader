@@ -4,72 +4,43 @@ import { describe, expect, it } from 'vitest'
 
 describe('classify assets', () => {
   it('should classify non css, xml and font items to other', () => {
-    const manifest: ManifestAttr[] = [
-      {
-        id: 'id',
-        href: 'href',
-        'media-type': 'media-type'
-      }
-    ]
+    const item = {
+      id: 'id',
+      href: 'href',
+      'media-type': 'media-type'
+    }
+    const manifest: ManifestAttr[] = [item]
     const classifiedAssets = classifyAssets(manifest)
-    expect(classifiedAssets).toEqual({
-      css: [],
-      font: [],
-      xml: [],
-      other: [
-        {
-          id: 'id',
-          href: 'href',
-          'media-type': 'media-type'
-        }
-      ]
+    expect(classifiedAssets).toMatchObject({
+      other: [item]
     })
     // Test case
   })
-  it('should classify css items to css', () => {
-    const manifest: ManifestAttr[] = [
-      {
-        id: 'id',
-        href: 'href',
-        'media-type': 'text/css'
-      }
-    ]
-    const classifiedAssets = classifyAssets(manifest)
-    expect(classifiedAssets).toEqual({
-      css: [
-        {
-          id: 'id',
-          href: 'href',
-          'media-type': 'text/css'
-        }
-      ],
-      font: [],
-      xml: [],
-      other: []
-    })
-    //   // Test case
-  }),
-    it('should classify font items to font', () => {
-      const manifest: ManifestAttr[] = [
-        {
-          id: 'id',
-          href: 'href',
-          'media-type': 'application/x-font-ttf'
-        }
-      ]
-      const classifiedAssets = classifyAssets(manifest)
-      expect(classifiedAssets).toEqual({
-        css: [],
-        font: [
-          {
-            id: 'id',
-            href: 'href',
-            'media-type': 'application/x-font-ttf'
-          }
-        ],
-        xml: [],
-        other: []
+
+  it.each(
+    Array.from(
+      Object.entries({
+        'text/css': 'css',
+        'application/x-font-ttf': 'font',
+        'application/x-font-truetype': 'font',
+        'application/x-font-opentype': 'font',
+        'application/font-woff': 'font',
+        'application/font-woff2': 'font',
+        'application/vnd.ms-fontobject': 'font',
+        'application/font-sfnt': 'font',
+        'application/xhtml+xml': 'xml'
       })
-      //   // Test case
+    ).map(([mediaType, type]) => ({ mediaType, type }))
+  )('should classify $mediaType to $type', ({ mediaType, type }) => {
+    const item = {
+      id: 'id',
+      href: 'href',
+      'media-type': mediaType
+    }
+    const manifest: ManifestAttr[] = [item]
+    const classifiedAssets = classifyAssets(manifest)
+    expect(classifiedAssets).toMatchObject({
+      [type]: [item]
     })
+  })
 })
