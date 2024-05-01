@@ -1,5 +1,5 @@
 import { app } from 'electron'
-import { BOOKS, PUBLIC } from 'src/main/modules/epub_constants'
+import { BOOKS } from 'src/main/modules/epub_constants'
 import { getAssets } from 'src/main/modules/getAssets'
 import { PORT } from 'src/main/modules/PORT'
 import { describe, it, expect, vi } from 'vitest'
