@@ -2,15 +2,14 @@ import path from 'path'
 import AdmZip from 'adm-zip'
 import md5 from 'md5'
 import fs from 'fs/promises'
-import type { Book, ManifestAttr, Store } from '../../shared/types'
+import type { Book, Store } from '../../shared/types'
 import { filetypemime, filetypename } from 'magic-bytes.js'
-import { routeFromPath } from './routeFromPath'
-import { PORT } from './PORT'
 import { getAssets } from './getAssets'
 import { getRouteFromRelativePath } from './getRouteFromRelativePath'
 import { getEpubCover } from './getEpubCover'
 import { getManifestFiles } from './getManifestFiles'
 import { getBookPath } from './getBookPath'
+import { formatBookDatails } from './formatBookDatails'
 
 export async function getCoverImage(filePath: string): Promise<string | null> {
   try {
@@ -112,34 +111,7 @@ async function parseEpub(bookFolder: string): Promise<Book> {
 
     const absoluteBookPath = path.join(getBookPath(), bookFolder)
 
-    const manifestMap: Map<string, ManifestAttr> = new Map()
-    manifest.forEach((item: ManifestAttr) => {
-      manifestMap.set(item.id, item)
-    })
-    const metadata = opfFileObj.metadata
-    const title = metadata['dc:title']._text
-    const opfDir = path.dirname(opfFilePath)
-
-    const spine = opfFileObj.spine.itemref
-      .map((item) => item._attributes)
-      .map((item) => {
-        const manifestItem = manifestMap.get(item.idref)
-        if (!manifestItem) {
-          return {
-            idref: item.idref,
-            route: '',
-            mediaType: ''
-          }
-        }
-        const regex = /public\/(.*)$/
-        return {
-          idref: item.idref,
-          route:
-            routeFromPath(path.join(absoluteBookPath, opfDir, manifestItem.href), PORT, regex) ||
-            '',
-          mediaType: manifestItem['media-type']
-        }
-      })
+    const { spine, title } = formatBookDatails(manifest, opfFileObj, opfFilePath, absoluteBookPath)
     // await updateSpineImageUrls(spine, bookFolder)
 
     const cover = await getEpubCover(opfFileObj)
