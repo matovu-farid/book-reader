@@ -38,3 +38,4 @@ export interface Store {
   currentBookId: string | number
   epubUrl: string
 }
+export type OPFFileObj = OPF['package']

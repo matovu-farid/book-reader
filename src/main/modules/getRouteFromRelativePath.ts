@@ -1,7 +1,7 @@
 import path from 'path'
 import { routeFromPath } from './routeFromPath'
 import { PORT } from './PORT'
-import { getBookPath } from './epub'
+import { getBookPath } from './getBookPath'
 
 export function getRouteFromRelativePath(bookFolder: string, relativePath: string) {
   const filePath = path.resolve(getBookPath(), bookFolder, relativePath)

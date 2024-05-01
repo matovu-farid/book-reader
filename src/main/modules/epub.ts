@@ -1,21 +1,21 @@
 import path from 'path'
 import AdmZip from 'adm-zip'
-import { app } from 'electron'
 import md5 from 'md5'
-import convert from 'xml-js'
 import fs from 'fs/promises'
-import type { Book, ManifestAttr, OPF, Container, Store } from '../../shared/types'
+import type { Book, ManifestAttr, Store } from '../../shared/types'
 import { filetypemime, filetypename } from 'magic-bytes.js'
 import { routeFromPath } from './routeFromPath'
 import { PORT } from './PORT'
 import { getAssets } from './getAssets'
 import { getRouteFromRelativePath } from './getRouteFromRelativePath'
-import { BOOKS, PUBLIC } from './epub_constants'
 import { getEpubCover } from './getEpubCover'
+import { getManifestFiles } from './getManifestFiles'
+import { getBookPath } from './getBookPath'
 
 export async function getCoverImage(filePath: string): Promise<string | null> {
   try {
     const bookFolder = md5(filePath)
+    const { opfFileObj } = await getManifestFiles(bookFolder)
     const file = await fs.readFile(filePath)
     const types = filetypename(file)
     const mimes = filetypemime(file)
@@ -25,7 +25,7 @@ export async function getCoverImage(filePath: string): Promise<string | null> {
       return null
     }
     await unzipEpub(filePath, bookFolder)
-    const cover = await getEpubCover(bookFolder)
+    const cover = await getEpubCover(opfFileObj)
     const { workingFolder } = await getManifestFiles(bookFolder)
 
     return getRouteFromRelativePath(workingFolder, cover)
@@ -53,17 +53,6 @@ export async function getBooks(): Promise<Book[]> {
   // await fs.rmdir(getBookPath())
 
   return Promise.all(booksPaths.map(async (bookPath) => parseEpub(bookPath)))
-}
-
-export function getBookPath(): string {
-  try {
-    const bookPath = path.join(app.getPath('appData'), PUBLIC, BOOKS)
-    fs.access(bookPath).catch(() => fs.mkdir(bookPath, { recursive: true }))
-    return bookPath
-  } catch (e) {
-    console.log(e)
-    return ''
-  }
 }
 
 async function saveBookStore(data: Store, outputDir: string): Promise<string> {
@@ -114,20 +103,6 @@ export async function unzipEpub(filePath: string, outDir: string): Promise<strin
   })
   return outputDirUrl
 }
-export async function getManifestFiles(bookFolder: string) {
-  const absoluteBookPath = path.join(getBookPath(), bookFolder)
-  const containerPath = path.join(absoluteBookPath, 'META-INF', 'container.xml')
-  const containerData = await fs.readFile(containerPath, 'utf8')
-  const containerObj = convert.xml2js(containerData, { compact: true }) as Container
-  const opfFilePath = containerObj.container.rootfiles.rootfile._attributes['full-path']
-  const workingFolder = path.join(absoluteBookPath, path.dirname(opfFilePath))
-  const opfFileData = await fs.readFile(path.join(absoluteBookPath, opfFilePath), 'utf8')
-  const opf: OPF = convert.xml2js(opfFileData, { compact: true }) as OPF
-
-  const opfFileObj = opf.package
-  const manifest: ManifestAttr[] = opfFileObj.manifest.item.map((item) => item._attributes)
-  return { manifest, opfFileObj, opfFilePath, workingFolder }
-}
 async function parseEpub(bookFolder: string): Promise<Book> {
   try {
     const { manifest, workingFolder, opfFileObj, opfFilePath } = await getManifestFiles(bookFolder)
@@ -166,7 +141,8 @@ async function parseEpub(bookFolder: string): Promise<Book> {
         }
       })
     // await updateSpineImageUrls(spine, bookFolder)
-    const cover = await getEpubCover(bookFolder)
+
+    const cover = await getEpubCover(opfFileObj)
     return {
       currentBookId: store.currentBookId,
       id: md5(absoluteBookPath),
