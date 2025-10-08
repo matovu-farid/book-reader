@@ -12,6 +12,7 @@ if (process.contextIsolated) {
     contextBridge.exposeInMainWorld('electron', electronAPI)
     contextBridge.exposeInMainWorld('api', api)
     contextBridge.exposeInMainWorld('functions', {
+      chooseFiles: () => ipcRenderer.invoke('files:choose'),
       getCoverImage: (filePath: string) => ipcRenderer.invoke('getCoverImage', filePath),
       getBooks: () => ipcRenderer.invoke('getBooks'),
       updateCurrentBookId: (bookFolder: string, currentBookId: number) =>

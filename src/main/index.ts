@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -6,9 +6,11 @@ import { deleteBook, getBooks, updateCurrentBookId } from './modules/epub'
 import { getCoverImage } from './modules/getCoverImage'
 import './modules/express'
 
+let mainWindow: BrowserWindow | null = null
+
 function createWindow(): void {
   // Create the browser window.
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1024,
     height: 770,
     title: 'Rishi',
@@ -17,12 +19,13 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      sandbox: false,
+      contextIsolation: true
     }
   })
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+    mainWindow?.show()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -41,6 +44,21 @@ function createWindow(): void {
 }
 
 function iPCHandlers(): void {
+  ipcMain.handle('files:choose', async () => {
+    if (!mainWindow) return []
+
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'EPUB Books', extensions: ['epub'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    })
+
+    if (canceled) return []
+    return filePaths // Returns real absolute paths
+  })
+
   ipcMain.handle('getCoverImage', (_, filePath) => getCoverImage(filePath))
   ipcMain.handle('getBooks', () => getBooks())
   ipcMain.handle('updateCurrentBookId', (_, bookFolder: string, currentBookId: string) =>

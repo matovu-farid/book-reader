@@ -9,7 +9,6 @@ import { unzipEpub } from './unzipEpub'
 export async function getCoverImage(filePath: string): Promise<string | null> {
   try {
     const bookFolder = md5(filePath)
-    const { opfFileObj } = await getManifestFiles(bookFolder)
     const file = await fs.readFile(filePath)
     const types = filetypename(file)
     const mimes = filetypemime(file)
@@ -19,6 +18,7 @@ export async function getCoverImage(filePath: string): Promise<string | null> {
       return null
     }
     await unzipEpub(filePath, bookFolder)
+    const { opfFileObj } = await getManifestFiles(bookFolder)
     const cover = await getEpubCover(opfFileObj)
     const { workingFolder } = await getManifestFiles(bookFolder)
 
