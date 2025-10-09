@@ -1,7 +1,7 @@
 import Loader from '@renderer/components/Loader'
 import { useQuery } from '@tanstack/react-query'
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
-import { ReactReader } from 'react-reader'
+import { ReactReader } from '@renderer/components/react-reader'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-toastify'
 import { Book } from 'src/shared/types'

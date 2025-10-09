@@ -1,4 +1,4 @@
-import { IReactReaderStyle, ReactReaderStyle } from 'react-reader'
+import { IReactReaderStyle, ReactReaderStyle } from '@renderer/components/react-reader/style'
 import { ReaderTheme } from './commonReader'
 
 export default function createIReactReaderTheme(theme: ReaderTheme): IReactReaderStyle {
