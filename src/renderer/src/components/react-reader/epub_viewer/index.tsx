@@ -1,3 +1,4 @@
+// Core imports for React component and ePub.js library
 import React, { Component } from 'react'
 import Epub, { Book } from 'epubjs'
 import type { NavItem, Contents, Rendition, Location } from 'epubjs'
@@ -5,71 +6,107 @@ import { EpubViewStyle as defaultStyles, type IEpubViewStyle } from './style'
 import type { RenditionOptions } from 'epubjs/types/rendition'
 import type { BookOptions } from 'epubjs/types/book'
 export { EpubViewStyle } from './style'
+
+// Extended rendition options to include popup handling capability
 export type RenditionOptionsFix = RenditionOptions & {
   allowPopups: boolean
 }
 
+// Type definition for table of contents items
 export type IToc = {
   label: string
   href: string
 }
 
+/**
+ * Props interface for EpubView component
+ * This component is the core viewer that handles rendering EPUB books
+ */
 export type IEpubViewProps = {
-  url: string | ArrayBuffer
-  epubInitOptions?: Partial<BookOptions>
-  epubOptions?: Partial<RenditionOptionsFix>
-  epubViewStyles?: IEpubViewStyle
-  loadingView?: React.ReactNode
-  errorView?: React.ReactNode
-  location: string | number | null
-  locationChanged(value: string): void
-  showToc?: boolean
-  tocChanged?(value: NavItem[]): void
-  getRendition?(rendition: Rendition): void
-  handleKeyPress?(): void
-  handleTextSelected?(cfiRange: string, contents: Contents): void
-}
-type IEpubViewState = {
-  isLoaded: boolean
-  isError: boolean
-  toc: NavItem[]
+  url: string | ArrayBuffer // The EPUB file source (can be URL or raw data)
+  epubInitOptions?: Partial<BookOptions> // Options for initializing the book
+  epubOptions?: Partial<RenditionOptionsFix> // Options for rendering the book
+  epubViewStyles?: IEpubViewStyle // Custom styling for the viewer
+  loadingView?: React.ReactNode // Custom loading indicator
+  errorView?: React.ReactNode // Custom error display
+  location: string | number | null // Current reading location (CFI or page number)
+  locationChanged(value: string): void // Callback when user navigates to new location
+  showToc?: boolean // Whether to display table of contents
+  tocChanged?(value: NavItem[]): void // Callback when TOC is loaded
+  getRendition?(rendition: Rendition): void // Callback to access rendition instance
+  handleKeyPress?(): void // Custom keyboard event handler
+  handleTextSelected?(cfiRange: string, contents: Contents): void // Callback when text is selected
 }
 
+// Component state tracking loading status and table of contents
+type IEpubViewState = {
+  isLoaded: boolean // Whether the book has finished loading
+  isError: boolean // Whether an error occurred during loading
+  toc: NavItem[] // Parsed table of contents
+}
+
+/**
+ * EpubView Component
+ * Core component responsible for rendering EPUB books using epub.js library
+ * Handles book initialization, rendering, navigation, and event management
+ */
 export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
   state: Readonly<IEpubViewState> = {
     isLoaded: false,
     isError: false,
     toc: []
   }
+
+  // Reference to the DOM element where the book will be rendered
   viewerRef = React.createRef<HTMLDivElement>()
-  location?: string | number | null
-  book?: Book
-  rendition?: Rendition
-  prevPage?: () => void
-  nextPage?: () => void
+
+  // Instance variables for tracking book state
+  location?: string | number | null // Current reading position
+  book?: Book // The epub.js Book instance
+  rendition?: Rendition // The epub.js Rendition instance (handles display)
+  prevPage?: () => void // Function to navigate to previous page
+  nextPage?: () => void // Function to navigate to next page
 
   constructor(props: IEpubViewProps) {
     super(props)
     this.location = props.location
+    // Initialize all book-related properties as undefined
     this.book = this.rendition = this.prevPage = this.nextPage = undefined
   }
 
+  /**
+   * Component lifecycle: Setup
+   * Initializes the book and sets up keyboard navigation when component mounts
+   */
   componentDidMount() {
     this.initBook()
     document.addEventListener('keyup', this.handleKeyPress, false)
   }
 
+  /**
+   * Initialize the EPUB book
+   * - Creates a new Book instance from the provided URL
+   * - Sets up error handling
+   * - Loads and parses the table of contents
+   * - Triggers reader initialization once book is loaded
+   */
   initBook() {
     const { url, tocChanged, epubInitOptions } = this.props
+    // Destroy existing book instance if it exists (e.g., when switching books)
     if (this.book) {
       this.book.destroy()
     }
+    // Create new book instance with epub.js
     this.book = Epub(url, epubInitOptions)
+
+    // Handle book loading failures
     this.book.on('openFailed', () => {
       this.setState({
         isError: true
       })
     })
+
+    // Once navigation data is loaded, extract TOC and initialize the reader
     this.book.loaded.navigation.then(({ toc }) => {
       this.setState(
         {
@@ -78,6 +115,7 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
           toc: toc
         },
         () => {
+          // Notify parent component of TOC and initialize the reader
           tocChanged && tocChanged(toc)
           this.initReader()
         }
@@ -85,14 +123,26 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
     })
   }
 
+  /**
+   * Component lifecycle: Cleanup
+   * Destroys book instance and removes event listeners to prevent memory leaks
+   */
   componentWillUnmount() {
     if (this.book) {
       this.book.destroy()
     }
+    // Clean up all references
     this.book = this.rendition = this.prevPage = this.nextPage = undefined
     document.removeEventListener('keyup', this.handleKeyPress, false)
   }
 
+  /**
+   * Performance optimization: Control when component should re-render
+   * Only re-render when:
+   * - Book is not yet loaded (to show loading states)
+   * - Location has changed (user navigated to different page)
+   * - URL has changed (different book is being loaded)
+   */
   shouldComponentUpdate(nextProps: IEpubViewProps) {
     return (
       !this.state.isLoaded ||
@@ -101,36 +151,58 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
     )
   }
 
+  /**
+   * Component lifecycle: Handle prop changes
+   * Responds to location changes and book URL changes
+   */
   componentDidUpdate(prevProps: IEpubViewProps) {
+    // Navigate to new location if location prop changed externally
     if (prevProps.location !== this.props.location && this.location !== this.props.location) {
       this.rendition?.display(this.props.location + '')
     }
+    // Reload book if URL changed (switching to different book)
     if (prevProps.url !== this.props.url) {
       this.initBook()
     }
   }
 
+  /**
+   * Initialize the EPUB reader (rendition)
+   * This creates the visual rendering of the book in the DOM
+   * - Sets up the rendition with proper dimensions
+   * - Configures navigation functions (prev/next page)
+   * - Registers event listeners
+   * - Displays initial location or first page
+   */
   initReader() {
     const { toc } = this.state
     const { location, epubOptions, getRendition } = this.props
     if (this.viewerRef.current) {
       const node = this.viewerRef.current
       if (this.book) {
+        // Create rendition instance that displays book in the DOM
         const rendition = this.book.renderTo(node, {
           width: '100%',
           height: '100%',
           ...epubOptions
         })
         this.rendition = rendition
+
+        // Set up pagination navigation functions
         this.prevPage = () => {
           rendition.prev()
         }
         this.nextPage = () => {
           rendition.next()
         }
+
+        // Set up event listeners for user interactions
         this.registerEvents()
+
+        // Provide rendition instance to parent component if callback exists
         getRendition && getRendition(rendition)
 
+        // Display the book at the specified location or start from beginning
         if (typeof location === 'string' || typeof location === 'number') {
           rendition.display(location + '')
         } else if (toc.length > 0 && toc[0].href) {
@@ -142,6 +214,13 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
     }
   }
 
+  /**
+   * Register event listeners for the rendition
+   * Handles:
+   * - Location changes (user navigating through book)
+   * - Keyboard input (arrow keys for navigation)
+   * - Text selection (for highlighting, notes, etc.)
+   */
   registerEvents() {
     const { handleKeyPress, handleTextSelected } = this.props
     if (this.rendition) {
@@ -153,6 +232,11 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
     }
   }
 
+  /**
+   * Handle location changes in the book
+   * Called when user navigates to a different page
+   * Updates internal state and notifies parent component
+   */
   onLocationChange = (loc: Location) => {
     const { location, locationChanged } = this.props
     const newLocation = `${loc.start}`
@@ -162,11 +246,21 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
     }
   }
 
+  /**
+   * Render the book container
+   * Creates the DOM element that will hold the rendered EPUB content
+   */
   renderBook() {
     const { epubViewStyles = defaultStyles } = this.props
     return <div ref={this.viewerRef} style={epubViewStyles.view} />
   }
 
+  /**
+   * Handle keyboard navigation
+   * Provides default keyboard controls if no custom handler is provided:
+   * - Right Arrow: Next page
+   * - Left Arrow: Previous page
+   */
   handleKeyPress = (event: KeyboardEvent) => {
     if (!this.props.handleKeyPress) {
       if (event.key === 'ArrowRight' && this.nextPage) {
@@ -178,6 +272,13 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
     }
   }
 
+  /**
+   * Main render method
+   * Conditionally renders:
+   * - Loading view: While book is loading
+   * - Error view: If book failed to load
+   * - Book view: Once book is successfully loaded
+   */
   render() {
     const { isLoaded, isError } = this.state
     const { loadingView = null, errorView = null, epubViewStyles = defaultStyles } = this.props
