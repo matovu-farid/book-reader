@@ -1,58 +1,14 @@
 // Core React imports and third-party libraries
-import React, { type CSSProperties, PureComponent, type ReactNode } from 'react'
-import { type SwipeableProps, type SwipeEventData, useSwipeable } from 'react-swipeable'
+import React, { PureComponent } from 'react'
+import { type SwipeEventData } from 'react-swipeable'
 import { EpubView, type IEpubViewProps } from './epub_viewer'
 import type { IEpubViewStyle } from './epub_viewer/style'
 import { ReactReaderStyle as defaultStyles, type IReactReaderStyle } from './style'
 import { type NavItem } from 'epubjs'
+import { SwipeWrapper, TableOfContents, TocToggleButton, NavigationArrows } from './components'
 
-// Props for the swipe gesture wrapper component
-type SwipeWrapperProps = {
-  children: ReactNode
-  swipeProps: Partial<SwipeableProps>
-}
-
-/**
- * SwipeWrapper Component
- * Wraps the reader with touch gesture support for mobile/tablet navigation
- * Enables swiping left/right to turn pages
- */
-const SwipeWrapper = ({ children, swipeProps }: SwipeWrapperProps) => {
-  const handlers = useSwipeable(swipeProps)
-  return (
-    <div style={{ height: '100%' }} {...handlers}>
-      {children}
-    </div>
-  )
-}
-
-// Props for individual table of contents items
-type TocItemProps = {
-  data: NavItem
-  setLocation: (value: string) => void
-  styles?: CSSProperties
-}
-
-/**
- * TocItem Component
- * Recursively renders table of contents entries with their subitems
- * Allows users to click on chapter/section names to navigate
- */
-const TocItem = ({ data, setLocation, styles }: TocItemProps) => (
-  <div>
-    <button onClick={() => setLocation(data.href)} style={styles}>
-      {data.label}
-    </button>
-    {/* Recursively render nested chapters/sections with indentation */}
-    {data.subitems && data.subitems.length > 0 && (
-      <div style={{ paddingLeft: 10 }}>
-        {data.subitems.map((item, i) => (
-          <TocItem key={i} data={item} styles={styles} setLocation={setLocation} />
-        ))}
-      </div>
-    )}
-  </div>
-)
+// Search result object containing location and excerpt
+type SearchResult = { cfi: string; excerpt: string }
 
 /**
  * Props for ReactReader component
@@ -70,9 +26,6 @@ export type IReactReaderProps = IEpubViewProps & {
   contextLength?: number // Number of characters to show around search results
   onSearchResults?: (results: SearchResult[]) => void // Callback with search results
 }
-
-// Search result object containing location and excerpt
-type SearchResult = { cfi: string; excerpt: string }
 
 // Component state for ReactReader
 type IReactReaderState = {
@@ -153,35 +106,6 @@ export class ReactReader extends PureComponent<IReactReaderProps, IReactReaderSt
   }
 
   /**
-   * Render table of contents sidebar
-   * Shows hierarchical list of chapters/sections
-   * Includes background overlay that closes TOC when clicked
-   */
-  renderToc() {
-    const { toc, expandedToc } = this.state
-    const { readerStyles = defaultStyles } = this.props
-    return (
-      <div>
-        <div style={readerStyles.tocArea}>
-          <div style={readerStyles.toc}>
-            {/* Render each top-level TOC entry (TocItem handles recursion) */}
-            {toc.map((item, i) => (
-              <TocItem
-                data={item}
-                key={i}
-                setLocation={this.setLocation}
-                styles={readerStyles.tocAreaButton}
-              />
-            ))}
-          </div>
-        </div>
-        {/* Dark overlay behind TOC that closes it when clicked */}
-        {expandedToc && <div style={readerStyles.tocBackground} onClick={this.toggleToc} />}
-      </div>
-    )
-  }
-
-  /**
    * Navigate to a specific location in the book
    * Called when user clicks on a TOC item
    * Closes the TOC and notifies parent component
@@ -193,31 +117,6 @@ export class ReactReader extends PureComponent<IReactReaderProps, IReactReaderSt
         expandedToc: false
       },
       () => locationChanged && locationChanged(loc)
-    )
-  }
-
-  /**
-   * Render the TOC toggle button
-   * Hamburger-style icon that changes appearance when TOC is open
-   * Located at top-left of the reader
-   */
-  renderTocToggle() {
-    const { expandedToc } = this.state
-    const { readerStyles = defaultStyles } = this.props
-    return (
-      <button
-        title="Toggle Table of Contents"
-        style={Object.assign(
-          {},
-          readerStyles.tocButton,
-          expandedToc ? readerStyles.tocButtonExpanded : {}
-        )}
-        onClick={this.toggleToc}
-      >
-        {/* Hamburger icon with two bars */}
-        <span style={Object.assign({}, readerStyles.tocButtonBar, readerStyles.tocButtonBarTop)} />
-        <span style={Object.assign({}, readerStyles.tocButtonBar, readerStyles.tocButtonBottom)} />
-      </button>
     )
   }
 
@@ -429,7 +328,13 @@ export class ReactReader extends PureComponent<IReactReaderProps, IReactReaderSt
           )}
         >
           {/* TOC toggle button (hamburger icon) */}
-          {showToc && this.renderTocToggle()}
+          {showToc && (
+            <TocToggleButton
+              expandedToc={expandedToc}
+              toggleToc={this.toggleToc}
+              readerStyles={readerStyles}
+            />
+          )}
 
           {/* Title bar at top */}
           <div style={readerStyles.titleArea}>{title}</div>
@@ -481,25 +386,24 @@ export class ReactReader extends PureComponent<IReactReaderProps, IReactReaderSt
             </div>
           </SwipeWrapper>
 
-          {/* Previous page arrow button (RTL-aware) */}
-          <button
-            style={Object.assign({}, readerStyles.arrow, readerStyles.prev)}
-            onClick={isRTL ? this.next : this.prev}
-          >
-            ‹
-          </button>
-
-          {/* Next page arrow button (RTL-aware) */}
-          <button
-            style={Object.assign({}, readerStyles.arrow, readerStyles.next)}
-            onClick={isRTL ? this.prev : this.next}
-          >
-            ›
-          </button>
+          {/* Navigation arrow buttons (RTL-aware) */}
+          <NavigationArrows
+            onPrev={isRTL ? this.next : this.prev}
+            onNext={isRTL ? this.prev : this.next}
+            readerStyles={readerStyles}
+          />
         </div>
 
         {/* Table of contents sidebar (conditionally rendered) */}
-        {showToc && toc && this.renderToc()}
+        {showToc && toc && (
+          <TableOfContents
+            toc={toc}
+            expandedToc={expandedToc}
+            setLocation={this.setLocation}
+            toggleToc={this.toggleToc}
+            readerStyles={readerStyles}
+          />
+        )}
       </div>
     )
   }
