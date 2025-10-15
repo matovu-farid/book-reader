@@ -36,6 +36,7 @@ export type IEpubViewProps = {
   getRendition?(rendition: Rendition): void // Callback to access rendition instance
   handleKeyPress?(): void // Custom keyboard event handler
   handleTextSelected?(cfiRange: string, contents: Contents): void // Callback when text is selected
+  onPageTextExtracted?(data: { text: string; location: string; html?: string }): void // Callback when page text is extracted
 }
 
 // Component state tracking loading status and table of contents
@@ -229,6 +230,14 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
       if (handleTextSelected) {
         this.rendition.on('selected', handleTextSelected)
       }
+      // call onPageTextExtracted on initial load
+      const { onPageTextExtracted } = this.props
+      if (onPageTextExtracted) {
+        this.rendition.on('rendered', () => {
+          const pageTextData = this.getCurrentPageText()
+          onPageTextExtracted(pageTextData)
+        })
+      }
     }
   }
 
@@ -238,11 +247,17 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
    * Updates internal state and notifies parent component
    */
   onLocationChange = (loc: Location) => {
-    const { location, locationChanged } = this.props
+    const { location, locationChanged, onPageTextExtracted } = this.props
     const newLocation = `${loc.start}`
     if (location !== newLocation) {
       this.location = newLocation
       locationChanged && locationChanged(newLocation)
+
+      // Extract and provide page text if callback is provided
+      if (onPageTextExtracted) {
+        const pageTextData = this.getCurrentPageText()
+        onPageTextExtracted(pageTextData)
+      }
     }
   }
 
@@ -253,6 +268,18 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
   renderBook() {
     const { epubViewStyles = defaultStyles } = this.props
     return <div ref={this.viewerRef} style={epubViewStyles.view} />
+  }
+
+  /**
+   * Extract visible text from the currently displayed page
+   * Returns structured data with text content and location metadata
+   */
+  getCurrentPageText = () => {
+    if (!this.rendition) {
+      return { text: '', location: '', html: '' }
+    }
+    const currentView = this.rendition?.getCurrentViewText() || ''
+    return { text: currentView, location: '', html: '' }
   }
 
   /**

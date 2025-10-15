@@ -45,7 +45,7 @@
     "dompurify": "^3.1.1",
     "epub-check": "^0.3.0",
     "epub-metadata-parser": "^1.1.14",
-    "epubjs": "^0.3.93",
+    "epubjs": "github:matovu-farid/epub.js#master",
     "express": "^4.19.2",
     "fetch-blob": "^4.0.0",
     "file-type": "^19.0.0",

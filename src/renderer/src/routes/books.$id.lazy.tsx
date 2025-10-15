@@ -137,6 +137,9 @@ function BookView(): JSX.Element {
                 <Loader />
               </div>
             }
+            onPageTextExtracted={(data) => {
+              console.log('onPageTextExtracted', data.text)
+            }}
             url={book.epubUrl}
             title={book.title}
             location={book.currentBookId || 0}

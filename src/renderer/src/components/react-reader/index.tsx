@@ -25,6 +25,7 @@ export type IReactReaderProps = IEpubViewProps & {
   searchQuery?: string // Text to search for in the book
   contextLength?: number // Number of characters to show around search results
   onSearchResults?: (results: SearchResult[]) => void // Callback with search results
+  onPageTextExtracted?: (data: { text: string; location: string; html?: string }) => void // Callback when page text is extracted
 }
 
 // Component state for ReactReader
@@ -88,6 +89,18 @@ export class ReactReader extends PureComponent<IReactReaderProps, IReactReaderSt
     if (node && node.prevPage) {
       node.prevPage()
     }
+  }
+
+  /**
+   * Get text from the currently displayed page
+   * Delegates to the EpubView component's getCurrentPageText method
+   */
+  getCurrentPageText = () => {
+    const node = this.readerRef.current
+    if (node && node.getCurrentPageText) {
+      return node.getCurrentPageText()
+    }
+    return { text: '', location: '', html: '' }
   }
 
   /**
@@ -380,6 +393,7 @@ export class ReactReader extends PureComponent<IReactReaderProps, IReactReaderSt
                 {...props}
                 tocChanged={this.onTocChange}
                 locationChanged={locationChanged}
+                onPageTextExtracted={this.props.onPageTextExtracted}
               />
               {/* Transparent overlay for swipe detection */}
               {swipeable && <div style={readerStyles.swipeWrapper} />}
