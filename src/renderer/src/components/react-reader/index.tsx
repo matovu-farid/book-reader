@@ -6,6 +6,7 @@ import type { IEpubViewStyle } from './epub_viewer/style'
 import { ReactReaderStyle as defaultStyles, type IReactReaderStyle } from './style'
 import { type NavItem } from 'epubjs'
 import { SwipeWrapper, TableOfContents, TocToggleButton, NavigationArrows } from './components'
+import type { ParagraphWithCFI } from 'src/shared/types'
 
 // Search result object containing location and excerpt
 type SearchResult = { cfi: string; excerpt: string }
@@ -25,7 +26,8 @@ export type IReactReaderProps = IEpubViewProps & {
   searchQuery?: string // Text to search for in the book
   contextLength?: number // Number of characters to show around search results
   onSearchResults?: (results: SearchResult[]) => void // Callback with search results
-  onPageTextExtracted?: (data: { text: string; location: string; html?: string }) => void // Callback when page text is extracted
+  onPageTextExtracted?: (data: { text: string }) => void // Callback when page text is extracted
+  onPageParagraphsExtracted?: (data: { paragraphs: ParagraphWithCFI[] }) => void // Callback when page paragraphs are extracted
 }
 
 // Component state for ReactReader
@@ -394,6 +396,7 @@ export class ReactReader extends PureComponent<IReactReaderProps, IReactReaderSt
                 tocChanged={this.onTocChange}
                 locationChanged={locationChanged}
                 onPageTextExtracted={this.props.onPageTextExtracted}
+                onPageParagraphsExtracted={this.props.onPageParagraphsExtracted}
               />
               {/* Transparent overlay for swipe detection */}
               {swipeable && <div style={readerStyles.swipeWrapper} />}

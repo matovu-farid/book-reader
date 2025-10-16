@@ -34,9 +34,7 @@ function RootComponent(): JSX.Element {
         .flatMap((book) => book.assets)
         .flatMap((asset) => asset.css)
         .filter((cssObj) => cssObj !== undefined)
-        .map((cssObj) => (
-          <link key={cssObj.id} rel="stylesheet" href={cssObj.href} />
-        ))}
+        .map((cssObj) => cssObj && <link key={cssObj.id} rel="stylesheet" href={cssObj.href} />)}
 
       <Outlet />
       <TanStackRouterDevtools />

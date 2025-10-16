@@ -1,4 +1,3 @@
-import React from 'react'
 import { type IReactReaderStyle } from '../style'
 
 // Props for NavigationArrows component

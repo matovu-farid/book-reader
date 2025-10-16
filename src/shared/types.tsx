@@ -39,3 +39,14 @@ export interface Store {
   epubUrl: string
 }
 export type OPFFileObj = OPF['package']
+
+export interface ParagraphWithCFI {
+  text: string
+  cfiRange: string
+}
+
+export interface TTSRequest {
+  bookId: string
+  cfiRange: string
+  text: string
+}

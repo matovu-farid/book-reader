@@ -5,6 +5,7 @@ import type { NavItem, Contents, Rendition, Location } from 'epubjs'
 import { EpubViewStyle as defaultStyles, type IEpubViewStyle } from './style'
 import type { RenditionOptions } from 'epubjs/types/rendition'
 import type { BookOptions } from 'epubjs/types/book'
+import type { ParagraphWithCFI } from 'src/shared/types'
 export { EpubViewStyle } from './style'
 
 // Extended rendition options to include popup handling capability
@@ -36,7 +37,8 @@ export type IEpubViewProps = {
   getRendition?(rendition: Rendition): void // Callback to access rendition instance
   handleKeyPress?(): void // Custom keyboard event handler
   handleTextSelected?(cfiRange: string, contents: Contents): void // Callback when text is selected
-  onPageTextExtracted?(data: { text: string; location: string; html?: string }): void // Callback when page text is extracted
+  onPageTextExtracted?(data: { text: string }): void // Callback when page text is extracted
+  onPageParagraphsExtracted?(data: { paragraphs: ParagraphWithCFI[] }): void // Callback when page paragraphs are extracted
 }
 
 // Component state tracking loading status and table of contents
@@ -230,12 +232,18 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
       if (handleTextSelected) {
         this.rendition.on('selected', handleTextSelected)
       }
-      // call onPageTextExtracted on initial load
-      const { onPageTextExtracted } = this.props
-      if (onPageTextExtracted) {
+      // call onPageTextExtracted and onPageParagraphsExtracted on initial load
+      const { onPageTextExtracted, onPageParagraphsExtracted } = this.props
+      if (onPageTextExtracted || onPageParagraphsExtracted) {
         this.rendition.on('rendered', () => {
-          const pageTextData = this.getCurrentPageText()
-          onPageTextExtracted(pageTextData)
+          if (onPageTextExtracted) {
+            const pageTextData = this.getCurrentPageText()
+            onPageTextExtracted(pageTextData)
+          }
+          if (onPageParagraphsExtracted) {
+            const pageParagraphsData = this.getCurrentPageParagraphs()
+            onPageParagraphsExtracted(pageParagraphsData)
+          }
         })
       }
     }
@@ -247,7 +255,7 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
    * Updates internal state and notifies parent component
    */
   onLocationChange = (loc: Location) => {
-    const { location, locationChanged, onPageTextExtracted } = this.props
+    const { location, locationChanged, onPageTextExtracted, onPageParagraphsExtracted } = this.props
     const newLocation = `${loc.start}`
     if (location !== newLocation) {
       this.location = newLocation
@@ -257,6 +265,12 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
       if (onPageTextExtracted) {
         const pageTextData = this.getCurrentPageText()
         onPageTextExtracted(pageTextData)
+      }
+
+      // Extract and provide page paragraphs if callback is provided
+      if (onPageParagraphsExtracted) {
+        const pageParagraphsData = this.getCurrentPageParagraphs()
+        onPageParagraphsExtracted(pageParagraphsData)
       }
     }
   }
@@ -276,10 +290,68 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
    */
   getCurrentPageText = () => {
     if (!this.rendition) {
-      return { text: '', location: '', html: '' }
+      return { text: '' }
     }
-    const currentView = this.rendition?.getCurrentViewText() || ''
-    return { text: currentView, location: '', html: '' }
+    const currentView = this.rendition?.getCurrentViewText()
+    // Handle both string and object return types from getCurrentViewText
+    const textValue = typeof currentView === 'string' ? currentView : currentView?.text || ''
+    return { text: textValue }
+  }
+
+  /**
+   * Extract paragraphs from the currently displayed page using rendition.getContents()
+   * Returns structured data with array of paragraph objects including CFI ranges
+   */
+  getCurrentPageParagraphs = () => {
+    if (!this.rendition) {
+      return { paragraphs: [] }
+    }
+    return this.getCurrentViewParagraphs()
+  }
+
+  /**
+   * Extract paragraphs from a rendition instance
+   * Returns full paragraph objects with text and CFI ranges
+   */
+  getCurrentViewParagraphs = () => {
+    try {
+      if (!this.rendition) {
+        return { paragraphs: [] }
+      }
+
+      const result = this.rendition.getCurrentViewParagraphs()
+      if (result && Array.isArray(result)) {
+        // Return full paragraph objects with CFI ranges
+        const paragraphs: ParagraphWithCFI[] = result.map((item) => ({
+          text: item.text || '',
+          cfiRange: item.cfiRange || ''
+        }))
+        return { paragraphs }
+      }
+
+      return { paragraphs: [] }
+    } catch (error) {
+      console.warn('Error extracting paragraphs:', error)
+      return { paragraphs: [] }
+    }
+  }
+
+  /**
+   * Highlight a specific paragraph by CFI range
+   */
+  highlightParagraph = (cfiRange: string) => {
+    if (this.rendition && cfiRange) {
+      this.rendition.highlightRange(cfiRange)
+    }
+  }
+
+  /**
+   * Remove highlight from a specific paragraph by CFI range
+   */
+  removeHighlight = (cfiRange: string) => {
+    if (this.rendition && cfiRange) {
+      this.rendition.removeHighlight(cfiRange)
+    }
   }
 
   /**

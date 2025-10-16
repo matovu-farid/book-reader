@@ -4,6 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { deleteBook, getBooks, updateCurrentBookId } from './modules/epub'
 import { getCoverImage } from './modules/getCoverImage'
+import { ttsService } from './modules/ttsService'
 import './modules/express'
 
 let mainWindow: BrowserWindow | null = null
@@ -65,6 +66,74 @@ function iPCHandlers(): void {
     updateCurrentBookId(bookFolder, currentBookId)
   )
   ipcMain.handle('deleteBook', (_, bookFolder: string) => deleteBook(bookFolder))
+
+  // TTS handlers
+  ipcMain.handle(
+    'tts:request-audio',
+    async (_, bookId: string, cfiRange: string, text: string, priority = 0) => {
+      try {
+        return await ttsService.requestAudio(bookId, cfiRange, text, priority)
+      } catch (error) {
+        console.error('TTS request failed:', error)
+        throw error
+      }
+    }
+  )
+
+  ipcMain.handle('tts:get-audio-path', async (_, bookId: string, cfiRange: string) => {
+    try {
+      return await ttsService.getAudioPath(bookId, cfiRange)
+    } catch (error) {
+      console.error('Failed to get audio path:', error)
+      return null
+    }
+  })
+
+  ipcMain.handle('tts:get-api-key-status', () => {
+    try {
+      return ttsService.hasApiKey()
+    } catch (error) {
+      console.error('Failed to get API key status:', error)
+      return false
+    }
+  })
+
+  ipcMain.handle('tts:get-queue-status', () => {
+    try {
+      return ttsService.getQueueStatus()
+    } catch (error) {
+      console.error('Failed to get queue status:', error)
+      return { pending: 0, isProcessing: false, active: 0 }
+    }
+  })
+
+  ipcMain.handle('tts:clear-book-cache', async (_, bookId: string) => {
+    try {
+      await ttsService.clearBookCache(bookId)
+    } catch (error) {
+      console.error('Failed to clear book cache:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('tts:get-book-cache-size', async (_, bookId: string) => {
+    try {
+      return await ttsService.getBookCacheSize(bookId)
+    } catch (error) {
+      console.error('Failed to get book cache size:', error)
+      return 0
+    }
+  })
+
+  // Forward TTS events to renderer
+  ttsService.on('audio-ready', (event) => {
+    mainWindow?.webContents.send('tts:audio-ready', event)
+  })
+
+  // Forward TTS error events to renderer
+  ttsService.on('error', (event) => {
+    mainWindow?.webContents.send('tts:error', event)
+  })
 }
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.

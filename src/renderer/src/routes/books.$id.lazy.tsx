@@ -4,7 +4,7 @@ import { createLazyFileRoute, Link } from '@tanstack/react-router'
 import { ReactReader } from '@renderer/components/react-reader'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-toastify'
-import { Book } from 'src/shared/types'
+import { Book, ParagraphWithCFI } from 'src/shared/types'
 import { useEffect, useRef, useState } from 'react'
 import { Button, FormControlLabel, IconButton, Radio, RadioGroup } from '@mui/material'
 import { Rendition } from 'epubjs'
@@ -15,6 +15,8 @@ import { themes } from '@renderer/themes/themes'
 import createIReactReaderTheme from '@renderer/themes/readerThemes'
 import { ThemeProvider, THEME_ID, createTheme } from '@mui/material/styles'
 import PaletteIcon from '@mui/icons-material/Palette'
+import { useTTS } from '@renderer/hooks/useTTS'
+import { TTSControls } from '@renderer/components/TTSControls'
 
 export const Route = createLazyFileRoute('/books/$id')({
   component: () => <BookView />
@@ -88,6 +90,31 @@ function BookView(): JSX.Element {
     }
   })
 
+  // TTS hook
+  const tts = useTTS({
+    bookId: book?.id || '',
+    rendition: rendition.current || null,
+    onNavigateToPreviousPage: () => {
+      // Navigate to previous page
+      if (rendition.current) {
+        rendition.current.prev()
+      }
+    },
+    onNavigateToNextPage: () => {
+      // Navigate to next page
+      if (rendition.current) {
+        rendition.current.next()
+      }
+    }
+  })
+
+  // Handle paragraph extraction for TTS
+  const handlePageParagraphsExtracted = (data: { paragraphs: ParagraphWithCFI[] }) => {
+    if (data.paragraphs.length > 0) {
+      tts.setParagraphs(data.paragraphs)
+    }
+  }
+
   if (isError) return <div className="w-full h-full place-items-center grid"> {error.message}</div>
   if (isPending)
     return (
@@ -99,7 +126,7 @@ function BookView(): JSX.Element {
   return (
     <ThemeProvider theme={{ [THEME_ID]: materialTheme }}>
       <div className="relative">
-        <div className="absolute right-2 top-2 z-10">
+        <div className="absolute right-2 top-2 z-10 flex items-center gap-2">
           <Link to="/">
             <Button
               disabled={book.currentBookId === 0}
@@ -109,6 +136,7 @@ function BookView(): JSX.Element {
               Back
             </Button>
           </Link>
+
           <IconButton {...bindTrigger(popupState)}>
             <PaletteIcon color="primary" />
           </IconButton>
@@ -137,9 +165,7 @@ function BookView(): JSX.Element {
                 <Loader />
               </div>
             }
-            onPageTextExtracted={(data) => {
-              console.log('onPageTextExtracted', data.text)
-            }}
+            onPageParagraphsExtracted={handlePageParagraphsExtracted}
             url={book.epubUrl}
             title={book.title}
             location={book.currentBookId || 0}
@@ -153,6 +179,11 @@ function BookView(): JSX.Element {
               rendition.current = _rendition
             }}
           />
+        </div>
+
+        {/* TTS Controls - Bottom Center */}
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-50">
+          <TTSControls tts={tts} />
         </div>
       </div>
     </ThemeProvider>

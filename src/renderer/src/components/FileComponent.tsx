@@ -128,9 +128,7 @@ function FileDrop(): JSX.Element {
           .flatMap((book) => book.assets)
           .flatMap((asset) => asset.css)
           .filter((cssObj) => cssObj !== undefined)
-          .map((cssObj) => (
-            <link key={cssObj.id} rel="stylesheet" href={cssObj.href} />
-          ))}
+          .map((cssObj) => cssObj && <link key={cssObj.id} rel="stylesheet" href={cssObj.href} />)}
         {isDragActive && (!books || books.length === 0) ? (
           <p>Drop the files here ...</p>
         ) : books && books.length > 0 ? (

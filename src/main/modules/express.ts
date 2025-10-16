@@ -12,8 +12,25 @@ const app = express()
 const publicDirectoryPath = () => path.join(electronApp.getPath('appData'), 'public') // Crea
 
 app.use(cors())
+
+// Add logging middleware
+app.use((req, _res, next) => {
+  console.log(`Express: ${req.method} ${req.url}`)
+  next()
+})
+
+// Test endpoint to verify server is working
+app.get('/test', (_req, res) => {
+  res.json({
+    message: 'Express server is running',
+    publicDir: publicDirectoryPath(),
+    timestamp: new Date().toISOString()
+  })
+})
+
 app.use(serveStatic(publicDirectoryPath()))
 app.use(serveIndex(publicDirectoryPath()))
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`)
+  console.log(`Serving files from: ${publicDirectoryPath()}`)
 })
