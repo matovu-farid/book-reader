@@ -187,7 +187,7 @@ class Rendition {
 
   /**
    * Require the manager from passed string, or as a class function
-   * @param  {string|object} manager [description]
+   * @param  {"default" | "continuous" | object} manager [description]
    * @return {method}
    */
   requireManager(manager) {
