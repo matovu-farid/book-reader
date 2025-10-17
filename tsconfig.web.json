@@ -19,8 +19,10 @@
         "src/renderer/src/*"
       ],
       "@shared/*": ["src/shared"],
-      "@epubjs": ["src/shared/epubjs/src/index"],
-      "@epubjs/*": ["src/shared/epubjs/src/*"]
+      "@epubjs": ["src/renderer/src/epubjs/src/index"],
+      "@epubjs/*": ["src/renderer/src/epubjs/src/*"],
+      "epubjs": ["src/renderer/src/epubjs/src/index"],
+      "epubjs/*": ["src/renderer/src/epubjs/src/*"]
     }
   }
 }
