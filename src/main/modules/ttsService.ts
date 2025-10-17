@@ -30,10 +30,11 @@ export class TTSService extends EventEmitter {
       }
     }
   >()
-  private readonly LISTENER_TIMEOUT_MS = 60000 // 1 minute timeout for listeners
+  private readonly LISTENER_TIMEOUT_MS = 30000 // 30 seconds timeout for listeners
 
   constructor() {
     super()
+    this.setMaxListeners(50) // Allow more concurrent requests
 
     // Forward audio-ready events from queue
     ttsQueue.on('audio-ready', (event: AudioReadyEvent) => {

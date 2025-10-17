@@ -1,11 +1,19 @@
 // Core imports for React component and ePub.js library
 import React, { Component } from 'react'
-import Epub, { Book } from 'epubjs'
-import type { NavItem, Contents, Rendition, Location } from 'epubjs'
+
+import type {
+  NavItem,
+  Contents,
+  Rendition,
+  Location,
+  RenditionOptions,
+  BookOptions,
+  Book
+} from '@epubjs'
+import Epub from '@epubjs/epub'
 import { EpubViewStyle as defaultStyles, type IEpubViewStyle } from './style'
-import type { RenditionOptions } from 'epubjs/types/rendition'
-import type { BookOptions } from 'epubjs/types/book'
 import type { ParagraphWithCFI } from 'src/shared/types'
+
 export { EpubViewStyle } from './style'
 
 // Extended rendition options to include popup handling capability
@@ -39,6 +47,7 @@ export type IEpubViewProps = {
   handleTextSelected?(cfiRange: string, contents: Contents): void // Callback when text is selected
   onPageTextExtracted?(data: { text: string }): void // Callback when page text is extracted
   onPageParagraphsExtracted?(data: { paragraphs: ParagraphWithCFI[] }): void // Callback when page paragraphs are extracted
+  onNextPageParagraphs?(data: { paragraphs: ParagraphWithCFI[] }): void // Callback when next page paragraphs are extracted
 }
 
 // Component state tracking loading status and table of contents
@@ -103,11 +112,11 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
     this.book = Epub(url, epubInitOptions)
 
     // Handle book loading failures
-    this.book.on('openFailed', () => {
-      this.setState({
-        isError: true
-      })
-    })
+    // this.book.on('openFailed', () => {
+    //   this.setState({
+    //     isError: true
+    //   })
+    // })
 
     // Once navigation data is loaded, extract TOC and initialize the reader
     this.book.loaded.navigation.then(({ toc }) => {
@@ -232,9 +241,9 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
       if (handleTextSelected) {
         this.rendition.on('selected', handleTextSelected)
       }
-      // call onPageTextExtracted and onPageParagraphsExtracted on initial load
-      const { onPageTextExtracted, onPageParagraphsExtracted } = this.props
-      if (onPageTextExtracted || onPageParagraphsExtracted) {
+      // call onPageTextExtracted, onPageParagraphsExtracted, and onNextPageParagraphs on initial load
+      const { onPageTextExtracted, onPageParagraphsExtracted, onNextPageParagraphs } = this.props
+      if (onPageTextExtracted || onPageParagraphsExtracted || onNextPageParagraphs) {
         this.rendition.on('rendered', () => {
           if (onPageTextExtracted) {
             const pageTextData = this.getCurrentPageText()
@@ -243,6 +252,14 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
           if (onPageParagraphsExtracted) {
             const pageParagraphsData = this.getCurrentPageParagraphs()
             onPageParagraphsExtracted(pageParagraphsData)
+          }
+          if (onNextPageParagraphs) {
+            this.getNextViewParagraphs().then((nextPageParagraphsData) => {
+              onNextPageParagraphs(nextPageParagraphsData)
+            })
+          } else {
+            // Always log next page paragraphs even if no callback is provided
+            this.getNextViewParagraphs()
           }
         })
       }
@@ -255,7 +272,13 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
    * Updates internal state and notifies parent component
    */
   onLocationChange = (loc: Location) => {
-    const { location, locationChanged, onPageTextExtracted, onPageParagraphsExtracted } = this.props
+    const {
+      location,
+      locationChanged,
+      onPageTextExtracted,
+      onPageParagraphsExtracted,
+      onNextPageParagraphs
+    } = this.props
     const newLocation = `${loc.start}`
     if (location !== newLocation) {
       this.location = newLocation
@@ -271,6 +294,18 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
       if (onPageParagraphsExtracted) {
         const pageParagraphsData = this.getCurrentPageParagraphs()
         onPageParagraphsExtracted(pageParagraphsData)
+      }
+
+      // Extract and log next page paragraphs on every new page
+      if (onNextPageParagraphs) {
+        this.getNextViewParagraphs().then((nextPageParagraphsData) => {
+          onNextPageParagraphs(nextPageParagraphsData)
+        })
+      } else {
+        // Always log next page paragraphs even if no callback is provided
+        this.getNextViewParagraphs().then((nextPageParagraphsData) => {
+          console.log('Next page paragraphs:', nextPageParagraphsData.paragraphs)
+        })
       }
     }
   }
@@ -332,6 +367,46 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
       return { paragraphs: [] }
     } catch (error) {
       console.warn('Error extracting paragraphs:', error)
+      return { paragraphs: [] }
+    }
+  }
+
+  /**
+   * Extract paragraphs from the next page using rendition.getNextViewParagraphs
+   * Returns structured data with array of paragraph objects including CFI ranges
+   */
+  getNextViewParagraphs = async () => {
+    try {
+      if (!this.rendition) {
+        return { paragraphs: [] }
+      }
+
+      // Check if getNextViewParagraphs method exists on rendition
+      if (typeof this.rendition.getNextViewParagraphs === 'function') {
+        const result = await this.rendition.getNextViewParagraphs()
+        if (result && Array.isArray(result)) {
+          // Return full paragraph objects with CFI ranges
+          const paragraphs: ParagraphWithCFI[] = result.map((item) => ({
+            text: item.text || '',
+            cfiRange: item.cfiRange || ''
+          }))
+          return { paragraphs }
+        }
+      } else {
+        // Fallback: simulate next page paragraphs by getting current page and logging them
+        // This is a placeholder implementation since getNextViewParagraphs doesn't exist in epub.js
+        console.log('getNextViewParagraphs method not available in epub.js rendition')
+        const currentParagraphs = this.getCurrentViewParagraphs()
+        console.log(
+          'Current page paragraphs (as fallback for next page):',
+          currentParagraphs.paragraphs
+        )
+        return currentParagraphs
+      }
+
+      return { paragraphs: [] }
+    } catch (error) {
+      console.warn('Error extracting next page paragraphs:', error)
       return { paragraphs: [] }
     }
   }

@@ -9,7 +9,9 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@renderer': resolve('src/renderer/src')
+      '@renderer': resolve('src/renderer/src'),
+      '@epubjs': resolve('src/shared/epubjs/src/index'),
+      '@epubjs/*': resolve('src/shared/epubjs/src/*')
     }
   }
 })

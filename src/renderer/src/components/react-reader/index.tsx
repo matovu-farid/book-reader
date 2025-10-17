@@ -4,7 +4,7 @@ import { type SwipeEventData } from 'react-swipeable'
 import { EpubView, type IEpubViewProps } from './epub_viewer'
 import type { IEpubViewStyle } from './epub_viewer/style'
 import { ReactReaderStyle as defaultStyles, type IReactReaderStyle } from './style'
-import { type NavItem } from 'epubjs'
+import { type NavItem } from '@epubjs'
 import { SwipeWrapper, TableOfContents, TocToggleButton, NavigationArrows } from './components'
 import type { ParagraphWithCFI } from 'src/shared/types'
 
@@ -28,6 +28,7 @@ export type IReactReaderProps = IEpubViewProps & {
   onSearchResults?: (results: SearchResult[]) => void // Callback with search results
   onPageTextExtracted?: (data: { text: string }) => void // Callback when page text is extracted
   onPageParagraphsExtracted?: (data: { paragraphs: ParagraphWithCFI[] }) => void // Callback when page paragraphs are extracted
+  onNextPageParagraphs?: (data: { paragraphs: ParagraphWithCFI[] }) => void // Callback when next page paragraphs are extracted
 }
 
 // Component state for ReactReader
@@ -203,7 +204,6 @@ export class ReactReader extends PureComponent<IReactReaderProps, IReactReaderSt
       return
     }
 
-    await book.ready
     const results: SearchResult[] = []
     const promises: Promise<void>[] = []
 
@@ -213,12 +213,13 @@ export class ReactReader extends PureComponent<IReactReaderProps, IReactReaderSt
       const promise = (async () => {
         try {
           // Load the chapter content
-          await item.load(book.load.bind(book))
+          await item.load(book.load.bind(book) as (url: string) => Promise<unknown>)
           const doc = item.document
           const textNodes: Node[] = []
+          if (!doc) return
 
           // Walk through DOM to collect all text nodes
-          const treeWalker = doc.createTreeWalker(doc, NodeFilter.SHOW_TEXT, null, false)
+          const treeWalker = doc.createTreeWalker(doc, NodeFilter.SHOW_TEXT)
           let node
           while ((node = treeWalker.nextNode())) {
             textNodes.push(node)
@@ -397,6 +398,7 @@ export class ReactReader extends PureComponent<IReactReaderProps, IReactReaderSt
                 locationChanged={locationChanged}
                 onPageTextExtracted={this.props.onPageTextExtracted}
                 onPageParagraphsExtracted={this.props.onPageParagraphsExtracted}
+                onNextPageParagraphs={this.props.onNextPageParagraphs}
               />
               {/* Transparent overlay for swipe detection */}
               {swipeable && <div style={readerStyles.swipeWrapper} />}

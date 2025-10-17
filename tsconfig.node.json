@@ -6,7 +6,9 @@
     "types": ["electron-vite/node"],
     "baseUrl": ".",
     "paths": { 
-      "@shared/*": ["src/shared"]
-     }
+      "@shared/*": ["src/shared"],
+      "@epubjs": ["src/shared/epubjs/src/index"],
+      "@epubjs/*": ["src/shared/epubjs/src/*"]
+    }
   }
 }

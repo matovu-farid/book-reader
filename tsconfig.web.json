@@ -13,13 +13,14 @@
     "composite": true,
     "jsx": "react-jsx",
     "baseUrl": ".",
+    "esModuleInterop": true,
     "paths": {
       "@renderer/*": [
         "src/renderer/src/*"
       ],
-     
-        "@shared/*": ["src/shared"]
-       
+      "@shared/*": ["src/shared"],
+      "@epubjs": ["src/shared/epubjs/src/index"],
+      "@epubjs/*": ["src/shared/epubjs/src/*"]
     }
   }
 }

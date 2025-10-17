@@ -7,7 +7,7 @@ import { toast } from 'react-toastify'
 import { Book, ParagraphWithCFI } from 'src/shared/types'
 import { useEffect, useRef, useState } from 'react'
 import { Button, FormControlLabel, IconButton, Radio, RadioGroup } from '@mui/material'
-import { Rendition } from 'epubjs'
+import { Rendition } from '@epubjs'
 import Menu from '@mui/material/Menu'
 import { usePopupState, bindTrigger, bindMenu } from 'material-ui-popup-state/hooks'
 import { ThemeType } from '@renderer/themes/common'
@@ -115,6 +115,12 @@ function BookView(): JSX.Element {
     }
   }
 
+  // Handle next page paragraphs extraction and logging
+  const handleNextPageParagraphs = (data: { paragraphs: ParagraphWithCFI[] }) => {
+    console.log('Next page paragraphs extracted:', data.paragraphs)
+    // You can add additional logic here to process the next page paragraphs
+  }
+
   if (isError) return <div className="w-full h-full place-items-center grid"> {error.message}</div>
   if (isPending)
     return (
@@ -166,6 +172,7 @@ function BookView(): JSX.Element {
               </div>
             }
             onPageParagraphsExtracted={handlePageParagraphsExtracted}
+            onNextPageParagraphs={handleNextPageParagraphs}
             url={book.epubUrl}
             title={book.title}
             location={book.currentBookId || 0}

@@ -13,7 +13,10 @@ export default defineConfig({
   renderer: {
     resolve: {
       alias: {
-        '@renderer': resolve('src/renderer/src')
+        '@renderer': resolve('src/renderer/src'),
+        '@shared': resolve('src/shared'),
+        '@epubjs$': resolve('src/shared/epubjs/src/index.ts'),
+        '@epubjs': resolve('src/shared/epubjs/src')
       }
     },
     plugins: [react(), TanStackRouterVite()]

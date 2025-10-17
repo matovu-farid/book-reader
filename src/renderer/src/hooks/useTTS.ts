@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
-import type { Rendition } from 'epubjs'
+import type { Rendition } from '@epubjs'
 import type { ParagraphWithCFI } from '../../../shared/types'
 import { useTTSStore } from '../stores/ttsStore'
 import { useTTSApiKeyStatus, useTTSQueueStatus, useRequestTTSAudio } from './useTTSQueries'
@@ -166,17 +166,7 @@ export function useTTS({
     ) => {
       if (data.bookId === bookId) {
         addToAudioCache(data.cfiRange, data.audioPath)
-
-        // If this is the current paragraph and we're playing, start playback
-        const currentParagraph = paragraphs[currentParagraphIndex]
-        if (
-          currentParagraph &&
-          currentParagraph.cfiRange === data.cfiRange &&
-          isPlaying &&
-          !isPaused
-        ) {
-          playAudio(data.audioPath)
-        }
+        // Don't auto-play here - let the requesting function handle it
       }
     }
 
@@ -185,29 +175,7 @@ export function useTTS({
     return () => {
       window.functions.removeTTSAudioReadyListener(handleAudioReady)
     }
-  }, [bookId, currentParagraphIndex, isPlaying, isPaused, paragraphs, addToAudioCache])
-
-  const playAudio = useCallback(
-    (audioPath: string) => {
-      if (!audioRef.current) {
-        console.error('Audio element not available')
-        return
-      }
-
-      // Audio path is now already a proper HTTP URL from the Express server
-      console.log('Playing audio from:', audioPath)
-
-      audioRef.current.src = audioPath
-      audioRef.current.play().catch((error) => {
-        console.error('Failed to play audio:', error)
-        console.error('Audio URL:', audioPath)
-        setError(`Audio playback failed: ${error.message}`)
-        setPlaying(false)
-        setLoading(false)
-      })
-    },
-    [setPlaying, setLoading, setError]
-  )
+  }, [bookId, addToAudioCache]) // Stable dependencies
 
   const requestAudio = useCallback(
     async (paragraph: ParagraphWithCFI, priority = 0): Promise<string | void> => {
@@ -275,21 +243,20 @@ export function useTTS({
       return
     }
 
+    // Remove current highlight BEFORE updating index
+    if (currentHighlightRef.current && rendition) {
+      try {
+        rendition.removeHighlight(currentHighlightRef.current)
+      } catch (error) {
+        console.warn('Failed to remove highlight:', error)
+      }
+    }
+
     // Move to next paragraph on same page
     setCurrentParagraphIndex(nextIndex)
 
     const nextParagraph = paragraphs[nextIndex]
     if (!nextParagraph) return
-
-    // Safely remove previous highlight
-    const prevParagraph = paragraphs[currentParagraphIndex - 1]
-    if (prevParagraph?.cfiRange && rendition) {
-      try {
-        rendition.removeHighlight(prevParagraph.cfiRange)
-      } catch (error) {
-        console.warn('Failed to remove previous highlight:', error)
-      }
-    }
 
     // Highlight next paragraph and store reference
     if (rendition) {
@@ -492,29 +459,70 @@ export function useTTS({
 
     setCurrentParagraphIndex(nextIndex)
 
-    // If playing, continue with next paragraph
-    if (isPlaying && !isPaused) {
-      const nextParagraph = paragraphs[nextIndex]
-      if (nextParagraph) {
-        // Store highlight reference and highlight paragraph
-        if (rendition) {
-          currentHighlightRef.current = nextParagraph.cfiRange
-          rendition.highlightRange(nextParagraph.cfiRange)
+    const nextParagraph = paragraphs[nextIndex]
+    if (!nextParagraph) return
+
+    // Always handle audio and highlighting when next is clicked
+    // Pause current audio first
+    if (audioRef.current) {
+      audioRef.current.pause()
+    }
+
+    // Highlight next paragraph
+    if (rendition) {
+      currentHighlightRef.current = nextParagraph.cfiRange
+      rendition.highlightRange(nextParagraph.cfiRange)
+    }
+
+    // If was playing, continue playing with next paragraph
+    if (isPlaying) {
+      setLoading(true)
+      try {
+        const audioPath = await requestAudio(nextParagraph, 2)
+        if (audioPath && audioRef.current) {
+          audioRef.current.pause()
+          audioRef.current.currentTime = 0
+          audioRef.current.src = audioPath
+          audioRef.current.load()
+
+          await new Promise((resolve, reject) => {
+            const handleCanPlay = () => {
+              audioRef.current?.removeEventListener('canplaythrough', handleCanPlay)
+              audioRef.current?.removeEventListener('error', handleError)
+              resolve(undefined)
+            }
+            const handleError = (e: Event) => {
+              audioRef.current?.removeEventListener('canplaythrough', handleCanPlay)
+              audioRef.current?.removeEventListener('error', handleError)
+              reject(e)
+            }
+            audioRef.current?.addEventListener('canplaythrough', handleCanPlay, { once: true })
+            audioRef.current?.addEventListener('error', handleError, { once: true })
+          })
+
+          await audioRef.current.play()
+          setLoading(false)
+          prefetchAudio(nextIndex + 1, 3)
         }
-        await requestAudio(nextParagraph, 2) // Fix: Add proper await
-        prefetchAudio(nextIndex + 1, 3)
+      } catch (error) {
+        console.error('Failed to play next paragraph:', error)
+        setError(
+          `Failed to play next paragraph: ${error instanceof Error ? error.message : 'Unknown error'}`
+        )
+        setLoading(false)
       }
     }
   }, [
     currentParagraphIndex,
     paragraphs,
     isPlaying,
-    isPaused,
     rendition,
     onNavigateToNextPage,
-    prefetchAudio,
     requestAudio,
-    setCurrentParagraphIndex
+    prefetchAudio,
+    setCurrentParagraphIndex,
+    setLoading,
+    setError
   ])
 
   const prev = useCallback(async () => {
@@ -539,47 +547,170 @@ export function useTTS({
 
     setCurrentParagraphIndex(prevIndex)
 
-    // If playing, continue with previous paragraph
-    if (isPlaying && !isPaused) {
-      const prevParagraph = paragraphs[prevIndex]
-      if (prevParagraph) {
-        // Store highlight reference and highlight paragraph
-        if (rendition) {
-          currentHighlightRef.current = prevParagraph.cfiRange
-          rendition.highlightRange(prevParagraph.cfiRange)
+    const prevParagraph = paragraphs[prevIndex]
+    if (!prevParagraph) return
+
+    // Always handle audio and highlighting when prev is clicked
+    // Pause current audio first
+    if (audioRef.current) {
+      audioRef.current.pause()
+    }
+
+    // Highlight previous paragraph
+    if (rendition) {
+      currentHighlightRef.current = prevParagraph.cfiRange
+      rendition.highlightRange(prevParagraph.cfiRange)
+    }
+
+    // If was playing, continue playing with previous paragraph
+    if (isPlaying) {
+      setLoading(true)
+      try {
+        const audioPath = await requestAudio(prevParagraph, 2)
+        if (audioPath && audioRef.current) {
+          audioRef.current.pause()
+          audioRef.current.currentTime = 0
+          audioRef.current.src = audioPath
+          audioRef.current.load()
+
+          await new Promise((resolve, reject) => {
+            const handleCanPlay = () => {
+              audioRef.current?.removeEventListener('canplaythrough', handleCanPlay)
+              audioRef.current?.removeEventListener('error', handleError)
+              resolve(undefined)
+            }
+            const handleError = (e: Event) => {
+              audioRef.current?.removeEventListener('canplaythrough', handleCanPlay)
+              audioRef.current?.removeEventListener('error', handleError)
+              reject(e)
+            }
+            audioRef.current?.addEventListener('canplaythrough', handleCanPlay, { once: true })
+            audioRef.current?.addEventListener('error', handleError, { once: true })
+          })
+
+          await audioRef.current.play()
+          setLoading(false)
+          // Prefetch backwards for previous paragraphs
+          prefetchAudio(prevIndex - 3, 3)
         }
-        await requestAudio(prevParagraph, 2) // Fix: Add proper await
-        // Prefetch backwards for previous paragraphs
-        prefetchAudio(prevIndex - 3, 3)
+      } catch (error) {
+        console.error('Failed to play previous paragraph:', error)
+        setError(
+          `Failed to play previous paragraph: ${error instanceof Error ? error.message : 'Unknown error'}`
+        )
+        setLoading(false)
       }
     }
   }, [
     currentParagraphIndex,
     paragraphs,
     isPlaying,
-    isPaused,
     rendition,
     onNavigateToPreviousPage,
-    prefetchAudio,
     requestAudio,
-    setCurrentParagraphIndex
+    prefetchAudio,
+    setCurrentParagraphIndex,
+    setLoading,
+    setError
   ])
 
   const setParagraphsCallback = useCallback(
     (newParagraphs: ParagraphWithCFI[]) => {
-      // Reset state when paragraphs change
-      stop()
+      const wasPlaying = isPlaying && !isPaused // Store playing state
+
+      // Stop current audio
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current.currentTime = 0
+      }
+
+      // Remove current highlight
+      if (currentHighlightRef.current && rendition) {
+        try {
+          rendition.removeHighlight(currentHighlightRef.current)
+          currentHighlightRef.current = null
+        } catch (error) {
+          console.warn('Failed to remove highlight:', error)
+        }
+      }
+
+      // Set new paragraphs
       setParagraphs(newParagraphs)
+      setCurrentParagraphIndex(0)
 
-      // Clear highlight reference when paragraphs change
-      currentHighlightRef.current = null
+      // If was playing, auto-start with first paragraph of new page
+      if (wasPlaying && newParagraphs.length > 0) {
+        const firstParagraph = newParagraphs[0]
 
-      // Prefetch first few paragraphs
-      if (newParagraphs.length > 0) {
-        prefetchAudio(0, Math.min(3, newParagraphs.length))
+        // Highlight first paragraph
+        if (rendition) {
+          currentHighlightRef.current = firstParagraph.cfiRange
+          rendition.highlightRange(firstParagraph.cfiRange)
+        }
+
+        // Start playing asynchronously
+        setLoading(true)
+        requestAudio(firstParagraph, 2)
+          .then((audioPath) => {
+            if (audioPath && audioRef.current) {
+              audioRef.current.pause()
+              audioRef.current.currentTime = 0
+              audioRef.current.src = audioPath
+              audioRef.current.load()
+
+              return new Promise((resolve, reject) => {
+                const handleCanPlay = () => {
+                  audioRef.current?.removeEventListener('canplaythrough', handleCanPlay)
+                  audioRef.current?.removeEventListener('error', handleError)
+                  resolve(undefined)
+                }
+                const handleError = (e: Event) => {
+                  audioRef.current?.removeEventListener('canplaythrough', handleCanPlay)
+                  audioRef.current?.removeEventListener('error', handleError)
+                  reject(e)
+                }
+                audioRef.current?.addEventListener('canplaythrough', handleCanPlay, { once: true })
+                audioRef.current?.addEventListener('error', handleError, { once: true })
+              }).then(() => {
+                return audioRef.current?.play()
+              })
+            }
+            return Promise.resolve()
+          })
+          .then(() => {
+            setLoading(false)
+            setPlaying(true) // Restore playing state
+            setPaused(false) // Ensure not paused
+            // Prefetch next paragraphs
+            prefetchAudio(1, 3)
+          })
+          .catch((error) => {
+            console.error('Failed to auto-play first paragraph of new page:', error)
+            setError(
+              `Failed to auto-play: ${error instanceof Error ? error.message : 'Unknown error'}`
+            )
+            setLoading(false)
+            setPlaying(false)
+          })
+      } else {
+        // Not playing, just prefetch
+        if (newParagraphs.length > 0) {
+          prefetchAudio(0, Math.min(3, newParagraphs.length))
+        }
       }
     },
-    [stop, setParagraphs, prefetchAudio]
+    [
+      isPlaying,
+      isPaused,
+      rendition,
+      setParagraphs,
+      setCurrentParagraphIndex,
+      requestAudio,
+      prefetchAudio,
+      setLoading,
+      setError,
+      setPlaying
+    ]
   )
 
   return {
