@@ -15,8 +15,9 @@ export default defineConfig({
       alias: {
         '@renderer': resolve('src/renderer/src'),
         '@shared': resolve('src/shared'),
-        '@epubjs$': resolve('src/shared/epubjs/src/index.ts'),
-        '@epubjs': resolve('src/shared/epubjs/src')
+        '@epubjs$': resolve('src/renderer/src/epubjs/src/index.js'),
+        '@epubjs': resolve('src/renderer/src/epubjs/src'),
+        epubjs: resolve('src/renderer/src/epubjs/src')
       }
     },
     plugins: [react(), TanStackRouterVite()]

@@ -9,8 +9,8 @@ import type {
   RenditionOptions,
   BookOptions,
   Book
-} from '@epubjs'
-import Epub from '@epubjs/epub'
+} from 'epubjs'
+import Epub from 'epubjs'
 import { EpubViewStyle as defaultStyles, type IEpubViewStyle } from './style'
 import type { ParagraphWithCFI } from 'src/shared/types'
 
