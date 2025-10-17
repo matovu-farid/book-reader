@@ -121,6 +121,12 @@ function BookView(): JSX.Element {
     // You can add additional logic here to process the next page paragraphs
   }
 
+  // Handle previous page paragraphs extraction and logging
+  const handlePreviousPageParagraphs = (data: { paragraphs: ParagraphWithCFI[] }) => {
+    console.log('Previous page paragraphs extracted:', data.paragraphs)
+    // You can add additional logic here to process the previous page paragraphs
+  }
+
   if (isError) return <div className="w-full h-full place-items-center grid"> {error.message}</div>
   if (isPending)
     return (
@@ -173,6 +179,7 @@ function BookView(): JSX.Element {
             }
             onPageParagraphsExtracted={handlePageParagraphsExtracted}
             onNextPageParagraphs={handleNextPageParagraphs}
+            onPreviousPageParagraphs={handlePreviousPageParagraphs}
             url={book.epubUrl}
             title={book.title}
             location={book.currentBookId || 0}

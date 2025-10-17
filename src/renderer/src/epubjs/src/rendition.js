@@ -16,6 +16,10 @@ import IframeView from './managers/views/iframe'
 // Default View Managers
 import DefaultViewManager from './managers/default/index'
 import ContinuousViewManager from './managers/continuous/index'
+
+/**
+ * @typedef {import('../types/book').default} Book
+ */
 /**
  * @typedef {Object} View
  * @property {number} index
@@ -1568,6 +1572,305 @@ class Rendition {
       end = layout.pageWidth
     } else {
       end = layout.height
+    }
+
+    return this.manager.mapping.page(contents, section.cfiBase, start, end)
+  }
+
+  /**
+   * Get the paragraphs from the previous view/page (not the currently visible one)
+   * @param {Object} options - The options object
+   * @param {number} options.minLength - The minimum length of the paragraphs
+   * @returns {Promise<Array<{text: string, cfiRange: string}>|null>} Promise that resolves to array of paragraph objects containing text content and CFI range, or null if no previous view exists
+   */
+  async getPreviousViewParagraphs(options = { minLength: 50 }) {
+    const { minLength = 50 } = options
+    if (!this.manager) {
+      return []
+    }
+
+    const location = this.manager.currentLocation()
+
+    if (!location || !Array.isArray(location) || !location.length || !location[0]) {
+      return []
+    }
+
+    const currentSection = location[0]
+    if (!currentSection.mapping || !currentSection.mapping.start || !currentSection.mapping.end) {
+      return []
+    }
+
+    const currentView = this.manager.views.find({
+      index: currentSection.index
+    })
+
+    if (!currentView || !currentView.section || !currentView.contents) {
+      return []
+    }
+
+    const hasPreviousPageInSection = this._hasPreviousPageInCurrentSection(
+      currentView,
+      currentSection
+    )
+    /**
+     * Paragraphs array
+     * @type {Paragraph[]}
+     */
+    let paragraphs
+    if (hasPreviousPageInSection) {
+      paragraphs = await this._getPreviousPageParagraphsInSectionAsync(currentView, currentSection)
+    } else {
+      const previousSectionParagraphs =
+        await this._getLastPageParagraphsInPreviousSection(currentView)
+      paragraphs = previousSectionParagraphs
+    }
+
+    if (minLength > 0) {
+      paragraphs = paragraphs.filter((p) => p.text.length >= minLength)
+    }
+
+    return paragraphs
+  }
+
+  /**
+   * Get paragraphs from the previous page within the current section
+   * @param {View} currentView - The current view
+   * @param {Section} currentSection - The current section location data
+   * @returns {Promise<Paragraph[]>} Promise that resolves to array of paragraph objects containing text content and CFI range, or null if no previous page exists
+   */
+  async _getPreviousPageParagraphsInSectionAsync(currentView, currentSection) {
+    try {
+      const layout = this.manager.layout
+      const currentPage = currentSection.pages[0] // First page in the current view
+
+      const previousPageEnd = (currentPage - 1) * layout.pageWidth
+      const previousPageStart = Math.max(0, previousPageEnd - layout.pageWidth)
+
+      const previousPageMapping = this.manager.mapping.page(
+        currentView.contents,
+        currentView.section.cfiBase,
+        previousPageStart,
+        previousPageEnd
+      )
+
+      if (!previousPageMapping || !previousPageMapping.start || !previousPageMapping.end) {
+        return []
+      }
+
+      const startCfi = new EpubCFI(previousPageMapping.start)
+      const endCfi = new EpubCFI(previousPageMapping.end)
+
+      let startRange = startCfi.toRange(currentView.contents.document)
+      let endRange = endCfi.toRange(currentView.contents.document)
+
+      if (!startRange || !endRange) {
+        return []
+      }
+
+      try {
+        const comparison = startRange.compareBoundaryPoints(Range.START_TO_START, endRange)
+        if (comparison > 0) {
+          const temp = startRange
+          startRange = endRange
+          endRange = temp
+        }
+      } catch (e) {
+        console.error('Error comparing range boundaries:', e)
+      }
+
+      const range = currentView.contents.document.createRange()
+      range.setStart(startRange.startContainer, startRange.startOffset)
+      range.setEnd(endRange.endContainer, endRange.endOffset)
+
+      const paragraphs = this._getParagraphsFromRange(range, currentView.contents)
+
+      return paragraphs
+    } catch (e) {
+      console.error('Error extracting previous page paragraphs:', e)
+      return []
+    }
+  }
+
+  /**
+   * Check if there's a previous page within the current section
+   * @param {View} currentView - The current view
+   * @param {Object} currentSection - The current section location data
+   * @returns {boolean} True if there's a previous page in the current section
+   * @private
+   */
+  _hasPreviousPageInCurrentSection(currentView, currentSection) {
+    // Use page numbers from location data
+    if (!currentSection.pages || !currentSection.totalPages) {
+      console.log('_hasPreviousPageInCurrentSection: No pages or totalPages data')
+      return false
+    }
+
+    // Check if current page is greater than 1
+    const currentPage = currentSection.pages[0] // First page in the current view
+    const hasPrevious = currentPage > 1
+
+    console.log('_hasPreviousPageInCurrentSection:', {
+      currentPage,
+      totalPages: currentSection.totalPages,
+      hasPrevious
+    })
+
+    return hasPrevious
+  }
+
+  /**
+   * Get paragraphs from the last page of the previous section
+   * @param {View} currentView - The current view
+   * @returns {Promise<Paragraph[]>} Promise that resolves to array of paragraph objects
+   * @private
+   */
+  async _getLastPageParagraphsInPreviousSection(currentView) {
+    const previousSection = currentView.section.prev()
+
+    if (!previousSection) {
+      console.log('_getLastPageParagraphsInPreviousSection: No previous section available')
+      return [] // No previous section available
+    }
+
+    // Try to find if the previous section is already loaded as a view
+    let previousView = this.manager.views.find({ index: previousSection.index })
+
+    if (!previousView) {
+      // The previous section is not loaded as a view yet
+      // Load the section content directly without creating a view
+      try {
+        console.log('_getLastPageParagraphsInPreviousSection: Loading previous section')
+        // Load the section content directly using the book's load method with timeout
+        const loadPromise = previousSection.load(this.book.load.bind(this.book))
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Section load timeout')), 10000)
+        )
+
+        const loadedContent = await Promise.race([loadPromise, timeoutPromise])
+
+        if (!loadedContent || !loadedContent.document) {
+          return []
+        }
+
+        const document = loadedContent.document
+        const body = document.body
+
+        if (!body) {
+          return []
+        }
+
+        // Create a Contents object from the loaded section
+        const contents = new Contents(
+          document,
+          body,
+          previousSection.cfiBase,
+          previousSection.index
+        )
+
+        // Get the last page mapping instead of the entire section
+        const lastPageMapping = this._getLastPageMapping(contents, previousSection)
+
+        if (!lastPageMapping || !lastPageMapping.start || !lastPageMapping.end) {
+          return []
+        }
+
+        // Convert CFIs to DOM ranges
+        const startCfi = new EpubCFI(lastPageMapping.start)
+        const endCfi = new EpubCFI(lastPageMapping.end)
+
+        const startRange = startCfi.toRange(document)
+        const endRange = endCfi.toRange(document)
+
+        if (!startRange || !endRange) {
+          return []
+        }
+
+        // Create a range that encompasses the last page content
+        const range = document.createRange()
+        range.setStart(startRange.startContainer, startRange.startOffset)
+        range.setEnd(endRange.endContainer, endRange.endOffset)
+
+        // Extract paragraphs from the range
+        const paragraphs = this._getParagraphsFromRange(range, contents)
+        console.log(
+          '_getLastPageParagraphsInPreviousSection: Found',
+          paragraphs.length,
+          'paragraphs in loaded section'
+        )
+        return paragraphs
+      } catch (e) {
+        console.error('Error loading previous section content:', e)
+        return []
+      }
+    }
+
+    // If the view is already loaded, use it
+    if (!previousView.contents || !previousView.contents.document) {
+      return []
+    }
+
+    try {
+      console.log('_getLastPageParagraphsInPreviousSection: Using already loaded view')
+      // Get the last page mapping instead of the entire section
+      const lastPageMapping = this._getLastPageMapping(previousView.contents, previousView.section)
+
+      if (!lastPageMapping || !lastPageMapping.start || !lastPageMapping.end) {
+        return []
+      }
+
+      // Convert CFIs to DOM ranges
+      const startCfi = new EpubCFI(lastPageMapping.start)
+      const endCfi = new EpubCFI(lastPageMapping.end)
+
+      const startRange = startCfi.toRange(previousView.contents.document)
+      const endRange = endCfi.toRange(previousView.contents.document)
+
+      if (!startRange || !endRange) {
+        return []
+      }
+
+      // Create a range that encompasses the last page content
+      const range = previousView.contents.document.createRange()
+      range.setStart(startRange.startContainer, startRange.startOffset)
+      range.setEnd(endRange.endContainer, endRange.endOffset)
+
+      // Extract paragraphs from the range
+      const paragraphs = this._getParagraphsFromRange(range, previousView.contents)
+      console.log(
+        '_getLastPageParagraphsInPreviousSection: Found',
+        paragraphs.length,
+        'paragraphs in existing view'
+      )
+      return paragraphs
+    } catch (e) {
+      console.error('Error extracting paragraphs from previous view:', e)
+      return []
+    }
+  }
+
+  /**
+   * Get the CFI mapping for the last page of a section
+   * @param {Contents} contents - The contents object
+   * @param {Section} section - The section object
+   * @returns {Object|null} The CFI mapping for the last page
+   * @private
+   */
+  _getLastPageMapping(contents, section) {
+    const layout = this.manager.layout
+
+    // For the last page, calculate based on total content height
+    let start, end
+
+    if (this.manager.settings.axis === 'horizontal') {
+      // For horizontal layout, get the last page width
+      const totalWidth = contents.content.scrollWidth
+      start = Math.max(0, totalWidth - layout.pageWidth)
+      end = totalWidth
+    } else {
+      // For vertical layout, get the last page height
+      const totalHeight = contents.content.scrollHeight
+      start = Math.max(0, totalHeight - layout.height)
+      end = totalHeight
     }
 
     return this.manager.mapping.page(contents, section.cfiBase, start, end)
