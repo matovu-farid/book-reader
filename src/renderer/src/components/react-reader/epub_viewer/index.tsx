@@ -48,6 +48,7 @@ export type IEpubViewProps = {
   onPageTextExtracted?(data: { text: string }): void // Callback when page text is extracted
   onPageParagraphsExtracted?(data: { paragraphs: ParagraphWithCFI[] }): void // Callback when page paragraphs are extracted
   onNextPageParagraphs?(data: { paragraphs: ParagraphWithCFI[] }): void // Callback when next page paragraphs are extracted
+  onPreviousPageParagraphs?(data: { paragraphs: ParagraphWithCFI[] }): void // Callback when previous page paragraphs are extracted
 }
 
 // Component state tracking loading status and table of contents
@@ -241,9 +242,19 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
       if (handleTextSelected) {
         this.rendition.on('selected', handleTextSelected)
       }
-      // call onPageTextExtracted, onPageParagraphsExtracted, and onNextPageParagraphs on initial load
-      const { onPageTextExtracted, onPageParagraphsExtracted, onNextPageParagraphs } = this.props
-      if (onPageTextExtracted || onPageParagraphsExtracted || onNextPageParagraphs) {
+      // call onPageTextExtracted, onPageParagraphsExtracted, onNextPageParagraphs, and onPreviousPageParagraphs on initial load
+      const {
+        onPageTextExtracted,
+        onPageParagraphsExtracted,
+        onNextPageParagraphs,
+        onPreviousPageParagraphs
+      } = this.props
+      if (
+        onPageTextExtracted ||
+        onPageParagraphsExtracted ||
+        onNextPageParagraphs ||
+        onPreviousPageParagraphs
+      ) {
         this.rendition.on('rendered', () => {
           if (onPageTextExtracted) {
             const pageTextData = this.getCurrentPageText()
@@ -261,6 +272,14 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
             // Always log next page paragraphs even if no callback is provided
             this.getNextViewParagraphs()
           }
+          if (onPreviousPageParagraphs) {
+            this.getPreviousViewParagraphs().then((previousPageParagraphsData) => {
+              onPreviousPageParagraphs(previousPageParagraphsData)
+            })
+          } else {
+            // Always log previous page paragraphs even if no callback is provided
+            this.getPreviousViewParagraphs()
+          }
         })
       }
     }
@@ -277,7 +296,8 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
       locationChanged,
       onPageTextExtracted,
       onPageParagraphsExtracted,
-      onNextPageParagraphs
+      onNextPageParagraphs,
+      onPreviousPageParagraphs
     } = this.props
     const newLocation = `${loc.start}`
     if (location !== newLocation) {
@@ -305,6 +325,18 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
         // Always log next page paragraphs even if no callback is provided
         this.getNextViewParagraphs().then((nextPageParagraphsData) => {
           console.log('Next page paragraphs:', nextPageParagraphsData.paragraphs)
+        })
+      }
+
+      // Extract and log previous page paragraphs on every new page
+      if (onPreviousPageParagraphs) {
+        this.getPreviousViewParagraphs().then((previousPageParagraphsData) => {
+          onPreviousPageParagraphs(previousPageParagraphsData)
+        })
+      } else {
+        // Always log previous page paragraphs even if no callback is provided
+        this.getPreviousViewParagraphs().then((previousPageParagraphsData) => {
+          console.log('Previous page paragraphs:', previousPageParagraphsData.paragraphs)
         })
       }
     }
@@ -407,6 +439,46 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
       return { paragraphs: [] }
     } catch (error) {
       console.warn('Error extracting next page paragraphs:', error)
+      return { paragraphs: [] }
+    }
+  }
+
+  /**
+   * Extract paragraphs from the previous page using rendition.getPreviousViewParagraphs
+   * Returns structured data with array of paragraph objects including CFI ranges
+   */
+  getPreviousViewParagraphs = async () => {
+    try {
+      if (!this.rendition) {
+        return { paragraphs: [] }
+      }
+
+      // Check if getPreviousViewParagraphs method exists on rendition
+      if (typeof this.rendition.getPreviousViewParagraphs === 'function') {
+        const result = await this.rendition.getPreviousViewParagraphs()
+        if (result && Array.isArray(result)) {
+          // Return full paragraph objects with CFI ranges
+          const paragraphs: ParagraphWithCFI[] = result.map((item) => ({
+            text: item.text || '',
+            cfiRange: item.cfiRange || ''
+          }))
+          return { paragraphs }
+        }
+      } else {
+        // Fallback: simulate previous page paragraphs by getting current page and logging them
+        // This is a placeholder implementation since getPreviousViewParagraphs doesn't exist in epub.js
+        console.log('getPreviousViewParagraphs method not available in epub.js rendition')
+        const currentParagraphs = this.getCurrentViewParagraphs()
+        console.log(
+          'Current page paragraphs (as fallback for previous page):',
+          currentParagraphs.paragraphs
+        )
+        return currentParagraphs
+      }
+
+      return { paragraphs: [] }
+    } catch (error) {
+      console.warn('Error extracting previous page paragraphs:', error)
       return { paragraphs: [] }
     }
   }

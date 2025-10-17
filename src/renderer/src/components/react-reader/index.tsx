@@ -29,6 +29,7 @@ export type IReactReaderProps = IEpubViewProps & {
   onPageTextExtracted?: (data: { text: string }) => void // Callback when page text is extracted
   onPageParagraphsExtracted?: (data: { paragraphs: ParagraphWithCFI[] }) => void // Callback when page paragraphs are extracted
   onNextPageParagraphs?: (data: { paragraphs: ParagraphWithCFI[] }) => void // Callback when next page paragraphs are extracted
+  onPreviousPageParagraphs?: (data: { paragraphs: ParagraphWithCFI[] }) => void // Callback when previous page paragraphs are extracted
 }
 
 // Component state for ReactReader
@@ -399,6 +400,7 @@ export class ReactReader extends PureComponent<IReactReaderProps, IReactReaderSt
                 onPageTextExtracted={this.props.onPageTextExtracted}
                 onPageParagraphsExtracted={this.props.onPageParagraphsExtracted}
                 onNextPageParagraphs={this.props.onNextPageParagraphs}
+                onPreviousPageParagraphs={this.props.onPreviousPageParagraphs}
               />
               {/* Transparent overlay for swipe detection */}
               {swipeable && <div style={readerStyles.swipeWrapper} />}
