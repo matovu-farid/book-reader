@@ -1,4 +1,3 @@
-import { ElectronAPI } from '@electron-toolkit/preload'
 import { Book } from 'src/shared/types'
 
 interface TTSAudioReadyEvent {
@@ -16,7 +15,6 @@ type TTSCallback = (event: ElectronEvent, data: TTSAudioReadyEvent) => void
 
 declare global {
   interface Window {
-    electron: ElectronAPI
     api: unknown
     functions: {
       chooseFiles: () => Promise<string[]>
