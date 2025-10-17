@@ -177,6 +177,19 @@ export function useTTS({
     }
   }, [bookId, addToAudioCache]) // Stable dependencies
 
+  /**
+   * Requests or retrieves the TTS (Text-to-Speech) audio for a given paragraph.
+   * 
+   * The lookup order is:
+   *   1. Check the local Zustand cache for a ready audio path.
+   *   2. Check disk cache by querying the TTS audio path API.
+   *   3. If not found, request generation via the TTS audio mutation.
+   * 
+   * @param paragraph - The paragraph object containing cfiRange and text.
+   * @param priority - Priority for generation. Defaults to 0 (normal).
+   * @returns The local file path for the paragraph's audio if found/generated, or `void` if the paragraph is empty.
+   * @throws Will throw and setError if remote TTS audio generation fails.
+   */
   const requestAudio = useCallback(
     async (paragraph: ParagraphWithCFI, priority = 0): Promise<string | void> => {
       if (!paragraph.text.trim()) return
