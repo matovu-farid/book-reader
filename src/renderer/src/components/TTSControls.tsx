@@ -1,12 +1,4 @@
-import {
-  IconButton,
-  Tooltip,
-  Box,
-  Typography,
-  CircularProgress,
-  Alert,
-  Snackbar
-} from '@mui/material'
+import { IconButton, Tooltip, Box, CircularProgress, Alert, Snackbar } from '@mui/material'
 import {
   PlayArrow as PlayIcon,
   Pause as PauseIcon,
@@ -19,6 +11,7 @@ import {
 } from '@mui/icons-material'
 import { useState } from 'react'
 import type { TTSControls as TTSControlsType } from '../hooks/useTTS'
+import { PlayingState } from '@renderer/stores/ttsStore'
 
 interface TTSControlsProps {
   tts: TTSControlsType
@@ -27,8 +20,7 @@ interface TTSControlsProps {
 
 export function TTSControls({ tts, disabled = false }: TTSControlsProps) {
   const { state } = tts
-  const { isPlaying, isPaused, currentParagraphIndex, paragraphs, isLoading, hasApiKey, error } =
-    state
+  const { paragraphs, hasApiKey, error, playingState } = state
   const [showError, setShowError] = useState(false)
 
   // Show error snackbar when error occurs
@@ -49,9 +41,9 @@ export function TTSControls({ tts, disabled = false }: TTSControlsProps) {
   }
 
   const handlePlay = () => {
-    if (isPlaying && isPaused) {
+    if (playingState === PlayingState.Paused) {
       tts.resume()
-    } else if (isPlaying) {
+    } else if (playingState === PlayingState.Playing) {
       tts.pause()
     } else {
       tts.play()
@@ -71,17 +63,14 @@ export function TTSControls({ tts, disabled = false }: TTSControlsProps) {
   }
 
   const getPlayIcon = () => {
-    if (isLoading) {
+    if (playingState === PlayingState.Loading) {
       return <CircularProgress size={24} color="inherit" />
     }
-    if (isPlaying && !isPaused) {
+    if (playingState === PlayingState.Playing) {
       return <PauseIcon sx={{ fontSize: 24 }} />
     }
     return <PlayIcon sx={{ fontSize: 24 }} />
   }
-
-  const progressText =
-    paragraphs.length > 0 ? `${currentParagraphIndex + 1} / ${paragraphs.length}` : '0 / 0'
 
   return (
     <>
@@ -102,7 +91,7 @@ export function TTSControls({ tts, disabled = false }: TTSControlsProps) {
         <VolumeIcon
           sx={{
             fontSize: 20,
-            color: isPlaying ? '#ffffff' : 'rgba(255, 255, 255, 0.7)'
+            color: playingState === PlayingState.Playing ? '#ffffff' : 'rgba(255, 255, 255, 0.7)'
           }}
         />
 
@@ -112,7 +101,7 @@ export function TTSControls({ tts, disabled = false }: TTSControlsProps) {
             <IconButton
               size="large"
               onClick={handlePrev}
-              disabled={disabled || isLoading}
+              disabled={disabled || playingState === PlayingState.Loading}
               sx={{
                 padding: 1,
                 color: '#ffffff',
@@ -131,7 +120,13 @@ export function TTSControls({ tts, disabled = false }: TTSControlsProps) {
 
         {/* Play/Pause Button */}
         <Tooltip
-          title={isPlaying && !isPaused ? 'Pause' : isPlaying && isPaused ? 'Resume' : 'Play'}
+          title={
+            playingState === PlayingState.Playing
+              ? 'Pause'
+              : playingState === PlayingState.Paused
+                ? 'Resume'
+                : 'Play'
+          }
         >
           <span>
             <IconButton
@@ -140,7 +135,8 @@ export function TTSControls({ tts, disabled = false }: TTSControlsProps) {
               disabled={disabled}
               sx={{
                 padding: 1,
-                color: isPlaying ? '#ffffff' : 'rgba(255, 255, 255, 0.8)',
+                color:
+                  playingState === PlayingState.Playing ? '#ffffff' : 'rgba(255, 255, 255, 0.8)',
                 '&:hover': {
                   backgroundColor: 'rgba(255, 255, 255, 0.1)'
                 },
@@ -160,7 +156,7 @@ export function TTSControls({ tts, disabled = false }: TTSControlsProps) {
             <IconButton
               size="large"
               onClick={handleStop}
-              disabled={disabled || !isPlaying}
+              disabled={disabled || playingState !== PlayingState.Playing}
               sx={{
                 padding: 1,
                 color: '#ffffff',
@@ -183,7 +179,7 @@ export function TTSControls({ tts, disabled = false }: TTSControlsProps) {
             <IconButton
               size="large"
               onClick={handleNext}
-              disabled={disabled || isLoading}
+              disabled={disabled || playingState === PlayingState.Loading}
               sx={{
                 padding: 1,
                 color: '#ffffff',
@@ -199,20 +195,6 @@ export function TTSControls({ tts, disabled = false }: TTSControlsProps) {
             </IconButton>
           </span>
         </Tooltip>
-
-        {/* Progress Indicator */}
-        <Typography
-          variant="caption"
-          sx={{
-            fontSize: 14,
-            color: 'rgba(255, 255, 255, 0.8)',
-            minWidth: '50px',
-            textAlign: 'center',
-            fontWeight: 500
-          }}
-        >
-          {progressText}
-        </Typography>
 
         {/* Error Icon (if there's an error) */}
         {error && (

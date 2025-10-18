@@ -34,36 +34,124 @@ var _index2 = _interopRequireDefault(require('./managers/continuous/index'))
 function _interopRequireDefault(obj) {
   return obj && obj.__esModule ? obj : { default: obj }
 }
+/**
+ * @typedef {import('./utils/hook').default} Hook
+ * @typedef {import('./themes').default} Themes
+ * @typedef {import('./annotations').default} Annotations
+ * @typedef {import('./epubcfi').default} EpubCFI
+ * @typedef {import('./utils/queue').default} Queue
+ * @typedef {import('./utils/core').defer} Deferred
+ * @typedef {import('./layout').default} Layout
+ * @typedef {import('./contents').default} Contents
+ * @typedef {import('./utils/constants').EVENTS} Constants
+ * @typedef {import('./managers/views/iframe').default} IframeView
+ * @typedef {import('./managers/default/index').default} DefaultViewManager
+ * @typedef {import('./managers/continuous/index').default} ContinuousViewManager
+ * @typedef {import('./section').default} Section
+
+ */
 
 // import Mapping from "./mapping";
 // Default Views
 // Default View Managers
 
 /**
+ * @typedef {import('../types/book').default} Book
+ */
+
+/**
+ * @typedef {Object} RenditionSettings - Configuration options for Rendition
+ * @property {number} [width] - Width of the rendition container
+ * @property {number} [height] - Height of the rendition container
+ * @property {string} [ignoreClass] - CSS class for the CFI parser to ignore
+ * @property {string|Function|Object} [manager='default'] - View manager to use
+ * @property {string|Function} [view='iframe'] - View type to use
+ * @property {string} [layout] - Layout to force (reflowable, pre-paginated)
+ * @property {string} [spread] - Force spread value (none, auto, both)
+ * @property {number} [minSpreadWidth=800] - Minimum width for spreads
+ * @property {string} [stylesheet] - URL of stylesheet to inject
+ * @property {boolean} [resizeOnOrientationChange=true] - Enable orientation change events
+ * @property {string} [script] - URL of script to inject
+ * @property {boolean|Object} [snap=false] - Use snap scrolling
+ * @property {string} [defaultDirection='ltr'] - Default text direction
+ * @property {boolean} [allowScriptedContent=false] - Enable running scripts in content
+ * @property {boolean} [allowPopups=false] - Enable opening popups in content
+ * @property {string} [flow] - Flow type (auto, paginated, scrolled)
+ * @property {string} [orientation] - Orientation setting
+ */
+
+/**
+ * @typedef {Object} DisplayedLocation - A rendered location range
+ * @property {Object} start - Start location information
+ * @property {string} start.index - Section index
+ * @property {string} start.href - Section href
+ * @property {Object} start.displayed - Display information
+ * @property {string} start.cfi - CFI string
+ * @property {number} start.location - Location number
+ * @property {number} start.percentage - Percentage through book
+ * @property {number} start.displayed.page - Current page number
+ * @property {number} start.displayed.total - Total pages in section
+ * @property {Object} end - End location information
+ * @property {string} end.index - Section index
+ * @property {string} end.href - Section href
+ * @property {Object} end.displayed - Display information
+ * @property {string} end.cfi - CFI string
+ * @property {number} end.location - Location number
+ * @property {number} end.percentage - Percentage through book
+ * @property {number} end.displayed.page - Current page number
+ * @property {number} end.displayed.total - Total pages in section
+ * @property {boolean} atStart - Whether at start of book
+ * @property {boolean} atEnd - Whether at end of book
+ */
+
+/**
+ * @typedef {Object} LayoutProperties - Layout properties for rendering
+ * @property {string} layout - Layout type
+ * @property {string} spread - Spread setting
+ * @property {string} orientation - Orientation setting
+ * @property {string} flow - Flow type
+ * @property {string} viewport - Viewport setting
+ * @property {number} minSpreadWidth - Minimum spread width
+ * @property {string} direction - Text direction
+ */
+
+/**
+ * @typedef {Object} ViewTextContent - Text content from current view
+ * @property {string} text - The text content
+ * @property {string} startCfi - Starting CFI
+ * @property {string} endCfi - Ending CFI
+ */
+
+/**
+ * @typedef {Object} ParagraphContent - Paragraph content with CFI
+ * @property {string} text - The paragraph text
+ * @property {string} cfi - CFI for the paragraph
+ */
+
+/**
+ * @typedef {Object} SizeInfo - Size information for resizing
+ * @property {number} width - Width value
+ * @property {number} height - Height value
+ */
+
+/**
  * Displays an Epub as a series of Views for each Section.
  * Requires Manager and View class to handle specifics of rendering
  * the section content.
- * @class
- * @param {Book} book
- * @param {object} [options]
- * @param {number} [options.width]
- * @param {number} [options.height]
- * @param {string} [options.ignoreClass] class for the cfi parser to ignore
- * @param {string | function | object} [options.manager='default']
- * @param {string | function} [options.view='iframe']
- * @param {string} [options.layout] layout to force
- * @param {string} [options.spread] force spread value
- * @param {number} [options.minSpreadWidth] overridden by spread: none (never) / both (always)
- * @param {string} [options.stylesheet] url of stylesheet to be injected
- * @param {boolean} [options.resizeOnOrientationChange] false to disable orientation events
- * @param {string} [options.script] url of script to be injected
- * @param {boolean | object} [options.snap=false] use snap scrolling
- * @param {string} [options.defaultDirection='ltr'] default text direction
- * @param {boolean} [options.allowScriptedContent=false] enable running scripts in content
- * @param {boolean} [options.allowPopups=false] enable opening popup in content
+ * @class Rendition
+ * @param {Book} book - The EPUB book instance
+ * @param {RenditionSettings} [options] - Configuration options for the rendition
  */
-class Rendition {
+class Rendition extends _eventEmitter.default {
+  /**
+   * Creates a new Rendition instance
+   * @param {Book} book - The EPUB book instance
+   * @param {RenditionSettings} [options] - Configuration options for the rendition
+   */
   constructor(book, options) {
+    super()
+
+    /** @type {RenditionSettings} */
     this.settings = (0, _core.extend)(this.settings || {}, {
       width: null,
       height: null,
@@ -85,24 +173,30 @@ class Rendition {
     ;(0, _core.extend)(this.settings, options)
 
     if (typeof this.settings.manager === 'object') {
+      /** @type {Object} */
       this.manager = this.settings.manager
     }
 
+    /** @type {Book} */
     this.book = book
     /**
-     * Adds Hook methods to the Rendition prototype
-     * @member {object} hooks
-     * @property {Hook} hooks.content
-     * @memberof Rendition
+     * Hook methods for different stages of rendering
+     * @type {Object.<string, Hook>}
      */
-
     this.hooks = {}
+    /** @type {Hook} */
     this.hooks.display = new _hook.default(this)
+    /** @type {Hook} */
     this.hooks.serialize = new _hook.default(this)
+    /** @type {Hook} */
     this.hooks.content = new _hook.default(this)
+    /** @type {Hook} */
     this.hooks.unloaded = new _hook.default(this)
+    /** @type {Hook} */
     this.hooks.layout = new _hook.default(this)
+    /** @type {Hook} */
     this.hooks.render = new _hook.default(this)
+    /** @type {Hook} */
     this.hooks.show = new _hook.default(this)
     this.hooks.content.register(this.handleLinks.bind(this))
     this.hooks.content.register(this.passEvents.bind(this))
@@ -116,74 +210,41 @@ class Rendition {
     if (this.settings.script) {
       this.book.spine.hooks.content.register(this.injectScript.bind(this))
     }
-    /**
-     * @member {Themes} themes
-     * @memberof Rendition
-     */
-
+    /** @type {Themes} */
     this.themes = new _themes.default(this)
-    /**
-     * @member {Annotations} annotations
-     * @memberof Rendition
-     */
-
+    /** @type {Annotations} */
     this.annotations = new _annotations.default(this)
+    /** @type {EpubCFI} */
     this.epubcfi = new _epubcfi.default()
+    /** @type {Queue} */
     this.q = new _queue.default(this)
-    /**
-     * A Rendered Location Range
-     * @typedef location
-     * @type {Object}
-     * @property {object} start
-     * @property {string} start.index
-     * @property {string} start.href
-     * @property {object} start.displayed
-     * @property {EpubCFI} start.cfi
-     * @property {number} start.location
-     * @property {number} start.percentage
-     * @property {number} start.displayed.page
-     * @property {number} start.displayed.total
-     * @property {object} end
-     * @property {string} end.index
-     * @property {string} end.href
-     * @property {object} end.displayed
-     * @property {EpubCFI} end.cfi
-     * @property {number} end.location
-     * @property {number} end.percentage
-     * @property {number} end.displayed.page
-     * @property {number} end.displayed.total
-     * @property {boolean} atStart
-     * @property {boolean} atEnd
-     * @memberof Rendition
-     */
-
+    /** @type {DisplayedLocation|undefined} */
     this.location = undefined // Hold queue until book is opened
 
     this.q.enqueue(this.book.opened)
+    /** @type {Deferred} */
     this.starting = new _core.defer()
     /**
-     * @member {promise} started returns after the rendition has started
-     * @memberof Rendition
+     * Promise that resolves after the rendition has started
+     * @type {Promise}
      */
-
     this.started = this.starting.promise // Block the queue until rendering is started
 
     this.q.enqueue(this.start)
   }
   /**
    * Set the manager function
-   * @param {function} manager
+   * @param {Function|Object} manager - Manager function or object
+   * @returns {void}
    */
-
   setManager(manager) {
     this.manager = manager
   }
   /**
    * Require the manager from passed string, or as a class function
-   * @param  {string|object} manager [description]
-   * @return {method}
+   * @param {string|Object} manager - Manager string identifier or manager object
+   * @returns {Function|Object} Manager function or class
    */
-
   requireManager(manager) {
     var viewManager // If manager is a string, try to load from imported managers
 
@@ -200,10 +261,9 @@ class Rendition {
   }
   /**
    * Require the view from passed string, or as a class function
-   * @param  {string|object} view
-   * @return {view}
+   * @param {string|Object} view - View string identifier or view object
+   * @returns {Function|Object} View function or class
    */
-
   requireView(view) {
     var View // If view is a string, try to load from imported views,
 
@@ -218,9 +278,8 @@ class Rendition {
   }
   /**
    * Start the rendering
-   * @return {Promise} rendering has started
+   * @returns {Promise<void>} Promise that resolves when rendering has started
    */
-
   start() {
     if (
       !this.settings.layout &&
@@ -283,10 +342,9 @@ class Rendition {
   /**
    * Call to attach the container to an element in the dom
    * Container must be attached before rendering can begin
-   * @param  {element} element to attach to
-   * @return {Promise}
+   * @param {HTMLElement} element - Element to attach to
+   * @returns {Promise<void>} Promise that resolves when attached
    */
-
   attachTo(element) {
     return this.q.enqueue(
       function () {
@@ -310,10 +368,9 @@ class Rendition {
    * The request will be added to the rendering Queue,
    * so it will wait until book is opened, rendering started
    * and all other rendering tasks have finished to be called.
-   * @param  {string} target Url or EpubCFI
-   * @return {Promise}
+   * @param {string} target - URL or EpubCFI string
+   * @returns {Promise<Section>} Promise that resolves with the displayed section
    */
-
   display(target) {
     if (this.displaying) {
       this.displaying.resolve()
@@ -324,10 +381,9 @@ class Rendition {
   /**
    * Tells the manager what to display immediately
    * @private
-   * @param  {string} target Url or EpubCFI
-   * @return {Promise}
+   * @param {string} target - URL or EpubCFI string
+   * @returns {Promise<Section>} Promise that resolves with the displayed section
    */
-
   _display(target) {
     if (!this.book) {
       return
@@ -420,9 +476,9 @@ class Rendition {
   /**
    * Report what section has been displayed
    * @private
-   * @param  {*} view
+   * @param {Object} view - The view that was displayed
+   * @returns {void}
    */
-
   afterDisplayed(view) {
     view.on(_constants.EVENTS.VIEWS.MARK_CLICKED, (cfiRange, data) =>
       this.triggerMarkEvent(cfiRange, data, view.contents)
@@ -447,9 +503,9 @@ class Rendition {
   /**
    * Report what has been removed
    * @private
-   * @param  {*} view
+   * @param {Object} view - The view that was removed
+   * @returns {void}
    */
-
   afterRemoved(view) {
     this.hooks.unloaded.trigger(view, this).then(() => {
       /**
@@ -465,8 +521,10 @@ class Rendition {
   /**
    * Report resize events and display the last seen location
    * @private
+   * @param {SizeInfo} size - Size information
+   * @param {string} [epubcfi] - Optional CFI string
+   * @returns {void}
    */
-
   onResized(size, epubcfi) {
     /**
      * Emit that the rendition has been resized
@@ -492,8 +550,9 @@ class Rendition {
   /**
    * Report orientation events and display the last seen location
    * @private
+   * @param {string} orientation - Orientation value
+   * @returns {void}
    */
-
   onOrientationChange(orientation) {
     /**
      * Emit that the rendition has been rotated
@@ -506,19 +565,19 @@ class Rendition {
   /**
    * Move the Rendition to a specific offset
    * Usually you would be better off calling display()
-   * @param {object} offset
+   * @param {Object} offset - Offset object
+   * @returns {void}
    */
-
   moveTo(offset) {
     this.manager.moveTo(offset)
   }
   /**
    * Trigger a resize of the views
-   * @param {number} [width]
-   * @param {number} [height]
-   * @param {string} [epubcfi] (optional)
+   * @param {number} [width] - New width
+   * @param {number} [height] - New height
+   * @param {string} [epubcfi] - Optional CFI string
+   * @returns {void}
    */
-
   resize(width, height, epubcfi) {
     if (width) {
       this.settings.width = width
@@ -532,24 +591,22 @@ class Rendition {
   }
   /**
    * Clear all rendered views
+   * @returns {void}
    */
-
   clear() {
     this.manager.clear()
   }
   /**
    * Go to the next "page" in the rendition
-   * @return {Promise}
+   * @returns {Promise<void>} Promise that resolves when navigation is complete
    */
-
   next() {
     return this.q.enqueue(this.manager.next.bind(this.manager)).then(this.reportLocation.bind(this))
   }
   /**
    * Go to the previous "page" in the rendition
-   * @return {Promise}
+   * @returns {Promise<void>} Promise that resolves when navigation is complete
    */
-
   prev() {
     return this.q.enqueue(this.manager.prev.bind(this.manager)).then(this.reportLocation.bind(this))
   } //-- http://www.idpf.org/epub/301/spec/epub-publications.html#meta-properties-rendering
@@ -557,10 +614,9 @@ class Rendition {
   /**
    * Determine the Layout properties from metadata and settings
    * @private
-   * @param  {object} metadata
-   * @return {object} properties
+   * @param {Object} metadata - Book metadata
+   * @returns {LayoutProperties} Layout properties object
    */
-
   determineLayoutProperties(metadata) {
     var properties
     var layout = this.settings.layout || metadata.layout || 'reflowable'
@@ -592,9 +648,9 @@ class Rendition {
   /**
    * Adjust the flow of the rendition to paginated or scrolled
    * (scrolled-continuous vs scrolled-doc are handled by different view managers)
-   * @param  {string} flow
+   * @param {string} flow - Flow type (auto, paginated, scrolled, scrolled-doc, scrolled-continuous)
+   * @returns {void}
    */
-
   flow(flow) {
     var _flow = flow
 
@@ -627,9 +683,9 @@ class Rendition {
   }
   /**
    * Adjust the layout of the rendition to reflowable or pre-paginated
-   * @param  {object} settings
+   * @param {LayoutProperties} settings - Layout settings
+   * @returns {Layout|undefined} Layout instance or undefined
    */
-
   layout(settings) {
     if (settings) {
       this._layout = new _layout.default(settings)
@@ -649,10 +705,10 @@ class Rendition {
   }
   /**
    * Adjust if the rendition uses spreads
-   * @param  {string} spread none | auto (TODO: implement landscape, portrait, both)
-   * @param  {int} [min] min width to use spreads at
+   * @param {string} spread - Spread setting (none, auto, landscape, portrait, both)
+   * @param {number} [min] - Minimum width to use spreads at
+   * @returns {void}
    */
-
   spread(spread, min) {
     this.settings.spread = spread
 
@@ -670,9 +726,9 @@ class Rendition {
   }
   /**
    * Adjust the direction of the rendition
-   * @param  {string} dir
+   * @param {string} dir - Text direction (ltr, rtl)
+   * @returns {void}
    */
-
   direction(dir) {
     this.settings.direction = dir || 'ltr'
 
@@ -689,8 +745,8 @@ class Rendition {
    * Report the current location
    * @fires relocated
    * @fires locationChanged
+   * @returns {Promise<void>} Promise that resolves when location is reported
    */
-
   reportLocation() {
     return this.q.enqueue(
       function reportedLocation() {
@@ -760,9 +816,8 @@ class Rendition {
   }
   /**
    * Get the Current Location object
-   * @return {displayedLocation | promise} location (may be a promise)
+   * @returns {DisplayedLocation|Promise<DisplayedLocation>} Location object or promise
    */
-
   currentLocation() {
     var location = this.manager.currentLocation()
 
@@ -781,10 +836,10 @@ class Rendition {
   /**
    * Creates a Rendition#locationRange from location
    * passed by the Manager
-   * @returns {displayedLocation}
+   * @param {Array} location - Location array from manager
+   * @returns {DisplayedLocation} Displayed location object
    * @private
    */
-
   located(location) {
     if (!location.length) {
       return {}
@@ -851,8 +906,8 @@ class Rendition {
   }
   /**
    * Remove and Clean Up the Rendition
+   * @returns {void}
    */
-
   destroy() {
     // Clear the queue
     // this.q.clear();
@@ -875,9 +930,9 @@ class Rendition {
   /**
    * Pass the events from a view's Contents
    * @private
-   * @param  {Contents} view contents
+   * @param {Contents} contents - View contents
+   * @returns {void}
    */
-
   passEvents(contents) {
     _constants.DOM_EVENTS.forEach((e) => {
       contents.on(e, (ev) => this.triggerViewEvent(ev, contents))

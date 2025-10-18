@@ -33,7 +33,8 @@ export function useTTSQueueStatus() {
     refetchInterval: (query) => {
       // Only poll when there are active requests or processing
       const data = query.state.data
-      if (data?.isProcessing || (data as any)?.active > 0 || (data as any)?.pending > 0) {
+      if (!data) return false
+      if (data.isProcessing || data.active > 0 || data.pending > 0) {
         return 1000 // Poll every second when active
       }
       return false // Stop polling when idle
