@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import type { Rendition } from '@epubjs'
 import type { ParagraphWithCFI } from '../../../shared/types'
-import { useTTSStore } from '../stores/ttsStore'
+import { PlayingState, useTTSStore } from '../stores/ttsStore'
 import { useTTSApiKeyStatus, useTTSQueueStatus, useRequestTTSAudio } from './useTTSQueries'
 
 export interface TTSControls {
@@ -13,11 +13,9 @@ export interface TTSControls {
   prev: () => void
   setParagraphs: (paragraphs: ParagraphWithCFI[]) => void
   state: {
-    isPlaying: boolean
-    isPaused: boolean
+    playingState: PlayingState
     currentParagraphIndex: number
     paragraphs: ParagraphWithCFI[]
-    isLoading: boolean
     hasApiKey: boolean
     error: string | null
   }
@@ -28,30 +26,28 @@ interface UseTTSProps {
   rendition: Rendition | null
   onNavigateToPreviousPage: () => void
   onNavigateToNextPage: () => void
+  nextPageParagraphs?: ParagraphWithCFI[]
 }
 
 export function useTTS({
   bookId,
   rendition,
   onNavigateToPreviousPage,
-  onNavigateToNextPage
+  onNavigateToNextPage,
+  nextPageParagraphs = []
 }: UseTTSProps): TTSControls {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const currentHighlightRef = useRef<string | null>(null)
 
   // Zustand store
   const {
-    isPlaying,
-    isPaused,
-    isLoading,
+    playingState,
     hasApiKey,
     currentParagraphIndex,
     paragraphs,
     audioCache,
     error,
-    setPlaying,
-    setPaused,
-    setLoading,
+    setPlayingState,
     setHasApiKey,
     setCurrentParagraphIndex,
     setParagraphs,
@@ -94,9 +90,6 @@ export function useTTS({
 
     // Event handlers as stable functions
     const handleEnded = () => {
-      setPlaying(false)
-      setPaused(false)
-
       // Safely remove current highlight
       if (currentHighlightRef.current && rendition) {
         try {
@@ -113,8 +106,8 @@ export function useTTS({
     const handleError = (e: Event) => {
       console.error('Audio error:', e)
       setError('Audio playback failed')
-      setPlaying(false)
-      setLoading(false)
+
+      setPlayingState(PlayingState.Stopped)
     }
 
     audio.addEventListener('ended', handleEnded)
@@ -126,7 +119,7 @@ export function useTTS({
       audio.pause()
       audio.src = ''
     }
-  }, [setPlaying, setPaused, setError, setLoading]) // Include dependencies
+  }, [setPlayingState, setError]) // Include dependencies
 
   // Track page changes to handle audio continuation
   useEffect(() => {
@@ -134,7 +127,7 @@ export function useTTS({
 
     if (currentLocation && currentLocation !== useTTSStore.getState().currentPage) {
       // Page changed
-      if (isPlaying && !isPaused) {
+      if (playingState === PlayingState.Playing) {
         // Audio is playing - check if we need to continue
         const isMovingForward = true // For now, assume forward navigation
 
@@ -142,21 +135,12 @@ export function useTTS({
           // User manually navigated forward while audio playing
           // Reset to first paragraph of new page
           setCurrentParagraphIndex(0)
-        } else {
-          // User navigated backward - pause audio
-          pause()
         }
       }
 
       setCurrentPage(currentLocation)
     }
-  }, [
-    rendition?.location?.start?.cfi,
-    isPlaying,
-    isPaused,
-    setCurrentPage,
-    setCurrentParagraphIndex
-  ])
+  }, [rendition?.location?.start?.cfi, playingState, setCurrentPage, setCurrentParagraphIndex])
 
   // Set up audio ready listener
   useEffect(() => {
@@ -179,12 +163,12 @@ export function useTTS({
 
   /**
    * Requests or retrieves the TTS (Text-to-Speech) audio for a given paragraph.
-   * 
+   *
    * The lookup order is:
    *   1. Check the local Zustand cache for a ready audio path.
    *   2. Check disk cache by querying the TTS audio path API.
    *   3. If not found, request generation via the TTS audio mutation.
-   * 
+   *
    * @param paragraph - The paragraph object containing cfiRange and text.
    * @param priority - Priority for generation. Defaults to 0 (normal).
    * @returns The local file path for the paragraph's audio if found/generated, or `void` if the paragraph is empty.
@@ -243,8 +227,25 @@ export function useTTS({
     [paragraphs, requestAudio]
   )
 
+  const prefetchNextPageAudio = useCallback(
+    (count: number = 3) => {
+      if (nextPageParagraphs.length === 0) return
+      for (let i = 0; i < Math.min(count, nextPageParagraphs.length); i++) {
+        const paragraph = nextPageParagraphs[i]
+        requestAudio(paragraph, 1).catch((error) => {
+          console.warn(`Prefetch failed for next page paragraph ${i}:`, error)
+        })
+      }
+    },
+    [nextPageParagraphs, requestAudio]
+  )
+
   const advanceToNextParagraph = useCallback(async () => {
     const nextIndex = currentParagraphIndex + 1
+    if (nextIndex == paragraphs.length - 1) {
+      // Request audio for the next paragraphs of the next page
+      prefetchNextPageAudio(3)
+    }
 
     // Check if we're at end of current page
     if (nextIndex >= paragraphs.length) {
@@ -253,7 +254,10 @@ export function useTTS({
 
       // Wait for new paragraphs to load (handled by page change effect)
       // Audio will auto-start with first paragraph of next page
-      return
+      // return
+      if (playingState !== PlayingState.Playing) {
+        return
+      }
     }
 
     // Remove current highlight BEFORE updating index
@@ -306,14 +310,14 @@ export function useTTS({
         })
 
         await audioRef.current.play()
-        setLoading(false) // Fix: Set loading to false when audio starts playing
+        setPlayingState(PlayingState.Playing) // Fix: Set loading to false when audio starts playing
       }
 
       // Prefetch next paragraphs
       prefetchAudio(nextIndex + 1, 3)
     } catch (error) {
       console.error('Failed to advance:', error)
-      setPlaying(false)
+      setPlayingState(PlayingState.Stopped)
     }
   }, [
     currentParagraphIndex,
@@ -321,10 +325,9 @@ export function useTTS({
     rendition,
     requestAudio,
     prefetchAudio,
+    prefetchNextPageAudio,
     onNavigateToNextPage,
-    setCurrentParagraphIndex,
-    setPlaying,
-    setLoading
+    setCurrentParagraphIndex
   ])
 
   // Update ref when function changes
@@ -346,9 +349,7 @@ export function useTTS({
     const currentParagraph = paragraphs[currentParagraphIndex]
     if (!currentParagraph) return
 
-    setPlaying(true)
-    setPaused(false)
-    setLoading(true)
+    setPlayingState(PlayingState.Playing)
     setError(null)
 
     // Highlight current paragraph and store reference
@@ -387,7 +388,7 @@ export function useTTS({
         })
 
         await audioRef.current.play()
-        setLoading(false)
+        setPlayingState(PlayingState.Playing)
 
         // Prefetch next paragraphs
         prefetchAudio(currentParagraphIndex + 1, 3)
@@ -395,8 +396,7 @@ export function useTTS({
     } catch (error) {
       console.error('Playback failed:', error)
       setError(`Playback failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-      setPlaying(false)
-      setLoading(false)
+      setPlayingState(PlayingState.Stopped)
     }
   }, [
     hasApiKey,
@@ -405,18 +405,16 @@ export function useTTS({
     rendition,
     requestAudio,
     prefetchAudio,
-    setPlaying,
-    setPaused,
-    setLoading,
+    setPlayingState,
     setError
   ])
 
   const pause = useCallback(() => {
     if (audioRef.current && !audioRef.current.paused) {
       audioRef.current.pause()
-      setPaused(true)
+      setPlayingState(PlayingState.Paused)
     }
-  }, [setPaused])
+  }, [setPlayingState])
 
   const resume = useCallback(() => {
     if (audioRef.current && audioRef.current.paused) {
@@ -424,9 +422,9 @@ export function useTTS({
         console.error('Failed to resume audio:', error)
         setError(`Failed to resume audio: ${error.message}`)
       })
-      setPaused(false)
+      setPlayingState(PlayingState.Playing)
     }
-  }, [setPaused, setError])
+  }, [setPlayingState, setError])
 
   const stop = useCallback(() => {
     if (audioRef.current) {
@@ -444,20 +442,25 @@ export function useTTS({
       }
     }
 
-    setPlaying(false)
-    setPaused(false)
-    setLoading(false)
+    setPlayingState(PlayingState.Stopped)
     setError(null)
-  }, [rendition, paragraphs, currentParagraphIndex, setPlaying, setPaused, setLoading, setError])
+  }, [rendition, paragraphs, currentParagraphIndex, setPlayingState, setError])
 
   const next = useCallback(async () => {
     const nextIndex = currentParagraphIndex + 1
+
+    if (nextIndex == paragraphs.length - 1) {
+      // Request audio for the next paragraphs of the next page
+      prefetchNextPageAudio(3)
+    }
 
     // If at end of current page, go to next page
     if (nextIndex >= paragraphs.length) {
       onNavigateToNextPage()
       setCurrentParagraphIndex(0)
-      return
+      if (playingState !== PlayingState.Playing) {
+        return
+      }
     }
 
     // Remove current highlight using stored reference
@@ -488,8 +491,7 @@ export function useTTS({
     }
 
     // If was playing, continue playing with next paragraph
-    if (isPlaying) {
-      setLoading(true)
+    if (playingState === PlayingState.Playing) {
       try {
         const audioPath = await requestAudio(nextParagraph, 2)
         if (audioPath && audioRef.current) {
@@ -514,7 +516,6 @@ export function useTTS({
           })
 
           await audioRef.current.play()
-          setLoading(false)
           prefetchAudio(nextIndex + 1, 3)
         }
       } catch (error) {
@@ -522,19 +523,19 @@ export function useTTS({
         setError(
           `Failed to play next paragraph: ${error instanceof Error ? error.message : 'Unknown error'}`
         )
-        setLoading(false)
+        setPlayingState(PlayingState.Stopped)
       }
     }
   }, [
     currentParagraphIndex,
     paragraphs,
-    isPlaying,
+    playingState,
     rendition,
     onNavigateToNextPage,
     requestAudio,
     prefetchAudio,
     setCurrentParagraphIndex,
-    setLoading,
+    setPlayingState,
     setError
   ])
 
@@ -576,8 +577,7 @@ export function useTTS({
     }
 
     // If was playing, continue playing with previous paragraph
-    if (isPlaying) {
-      setLoading(true)
+    if (playingState === PlayingState.Playing) {
       try {
         const audioPath = await requestAudio(prevParagraph, 2)
         if (audioPath && audioRef.current) {
@@ -602,7 +602,6 @@ export function useTTS({
           })
 
           await audioRef.current.play()
-          setLoading(false)
           // Prefetch backwards for previous paragraphs
           prefetchAudio(prevIndex - 3, 3)
         }
@@ -611,26 +610,23 @@ export function useTTS({
         setError(
           `Failed to play previous paragraph: ${error instanceof Error ? error.message : 'Unknown error'}`
         )
-        setLoading(false)
       }
     }
   }, [
     currentParagraphIndex,
     paragraphs,
-    isPlaying,
+    playingState,
     rendition,
     onNavigateToPreviousPage,
     requestAudio,
     prefetchAudio,
     setCurrentParagraphIndex,
-    setLoading,
+    setPlayingState,
     setError
   ])
 
   const setParagraphsCallback = useCallback(
     (newParagraphs: ParagraphWithCFI[]) => {
-      const wasPlaying = isPlaying && !isPaused // Store playing state
-
       // Stop current audio
       if (audioRef.current) {
         audioRef.current.pause()
@@ -652,7 +648,7 @@ export function useTTS({
       setCurrentParagraphIndex(0)
 
       // If was playing, auto-start with first paragraph of new page
-      if (wasPlaying && newParagraphs.length > 0) {
+      if (playingState === PlayingState.Playing && newParagraphs.length > 0) {
         const firstParagraph = newParagraphs[0]
 
         // Highlight first paragraph
@@ -662,7 +658,9 @@ export function useTTS({
         }
 
         // Start playing asynchronously
-        setLoading(true)
+        if (playingState !== PlayingState.Playing) {
+          setPlayingState(PlayingState.Loading)
+        }
         requestAudio(firstParagraph, 2)
           .then((audioPath) => {
             if (audioPath && audioRef.current) {
@@ -691,9 +689,7 @@ export function useTTS({
             return Promise.resolve()
           })
           .then(() => {
-            setLoading(false)
-            setPlaying(true) // Restore playing state
-            setPaused(false) // Ensure not paused
+            setPlayingState(PlayingState.Playing)
             // Prefetch next paragraphs
             prefetchAudio(1, 3)
           })
@@ -702,8 +698,7 @@ export function useTTS({
             setError(
               `Failed to auto-play: ${error instanceof Error ? error.message : 'Unknown error'}`
             )
-            setLoading(false)
-            setPlaying(false)
+            setPlayingState(PlayingState.Stopped)
           })
       } else {
         // Not playing, just prefetch
@@ -713,16 +708,15 @@ export function useTTS({
       }
     },
     [
-      isPlaying,
-      isPaused,
+      playingState,
+
       rendition,
       setParagraphs,
       setCurrentParagraphIndex,
       requestAudio,
       prefetchAudio,
-      setLoading,
-      setError,
-      setPlaying
+      setPlayingState,
+      setError
     ]
   )
 
@@ -735,11 +729,11 @@ export function useTTS({
     prev,
     setParagraphs: setParagraphsCallback,
     state: {
-      isPlaying,
-      isPaused,
+      playingState,
+
       currentParagraphIndex,
       paragraphs,
-      isLoading,
+
       hasApiKey,
       error
     }

@@ -1,11 +1,14 @@
 import { create } from 'zustand'
 import type { ParagraphWithCFI } from '../../../shared/types'
-
+export enum PlayingState {
+  Playing = 'playing',
+  Paused = 'paused',
+  Stopped = 'stopped',
+  Loading = 'loading'
+}
 interface TTSState {
   // Playback control
-  isPlaying: boolean
-  isPaused: boolean
-  isLoading: boolean
+  playingState: PlayingState
   hasApiKey: boolean
 
   // Navigation state
@@ -23,9 +26,7 @@ interface TTSState {
   error: string | null
 
   // Actions with proper error handling
-  setPlaying: (playing: boolean) => void
-  setPaused: (paused: boolean) => void
-  setLoading: (loading: boolean) => void
+  setPlayingState: (playingState: PlayingState) => void
   setHasApiKey: (hasKey: boolean) => void
   setError: (error: string | null) => void
   setCurrentParagraphIndex: (index: number) => void
@@ -39,9 +40,7 @@ interface TTSState {
 
 export const useTTSStore = create<TTSState>((set, get) => ({
   // Initial state
-  isPlaying: false,
-  isPaused: false,
-  isLoading: false,
+  playingState: PlayingState.Stopped,
   hasApiKey: false,
   currentParagraphIndex: 0,
   paragraphs: [],
@@ -51,9 +50,8 @@ export const useTTSStore = create<TTSState>((set, get) => ({
   error: null,
 
   // Actions
-  setPlaying: (playing) => set({ isPlaying: playing }),
-  setPaused: (paused) => set({ isPaused: paused }),
-  setLoading: (loading) => set({ isLoading: loading }),
+
+  setPlayingState: (playingState) => set({ playingState: playingState }),
   setHasApiKey: (hasKey) => set({ hasApiKey: hasKey }),
   setError: (error) => set({ error }),
 
@@ -72,9 +70,7 @@ export const useTTSStore = create<TTSState>((set, get) => ({
     set({
       paragraphs: [...paragraphs], // Create a shallow copy
       currentParagraphIndex: 0,
-      isPlaying: false,
-      isPaused: false,
-      isLoading: false,
+      playingState: PlayingState.Stopped,
       error: null
     }),
 
@@ -86,9 +82,8 @@ export const useTTSStore = create<TTSState>((set, get) => ({
         currentBookId: bookId,
         audioCache: new Map(),
         currentParagraphIndex: 0,
-        isPlaying: false,
-        isPaused: false,
-        isLoading: false,
+
+        playingState: PlayingState.Stopped,
         error: null
       })
     }
@@ -115,9 +110,7 @@ export const useTTSStore = create<TTSState>((set, get) => ({
 
   reset: () =>
     set({
-      isPlaying: false,
-      isPaused: false,
-      isLoading: false,
+      playingState: PlayingState.Stopped,
       currentParagraphIndex: 0,
       currentBookId: '',
       currentPage: '',

@@ -1,69 +1,80 @@
-"use strict";
+'use strict'
 
-Object.defineProperty(exports, "__esModule", {
+Object.defineProperty(exports, '__esModule', {
   value: true
-});
-exports.RangeObject = void 0;
-exports.blob2base64 = blob2base64;
-exports.borders = borders;
-exports.bounds = bounds;
-exports.createBase64Url = createBase64Url;
-exports.createBlob = createBlob;
-exports.createBlobUrl = createBlobUrl;
-exports.defaults = defaults;
-exports.defer = defer;
-exports.documentHeight = documentHeight;
-exports.extend = extend;
-exports.filterChildren = filterChildren;
-exports.findChildren = findChildren;
-exports.getParentByTagName = getParentByTagName;
-exports.indexOfElementNode = indexOfElementNode;
-exports.indexOfNode = indexOfNode;
-exports.indexOfSorted = indexOfSorted;
-exports.indexOfTextNode = indexOfTextNode;
-exports.insert = insert;
-exports.isElement = isElement;
-exports.isFloat = isFloat;
-exports.isNumber = isNumber;
-exports.isXml = isXml;
-exports.locationOf = locationOf;
-exports.nodeBounds = nodeBounds;
-exports.parents = parents;
-exports.parse = parse;
-exports.prefixed = prefixed;
-exports.qs = qs;
-exports.qsa = qsa;
-exports.qsp = qsp;
-exports.querySelectorByType = querySelectorByType;
-exports.requestAnimationFrame = void 0;
-exports.revokeBlobUrl = revokeBlobUrl;
-exports.sprint = sprint;
-exports.treeWalker = treeWalker;
-exports.type = type;
-exports.uuid = uuid;
-exports.walk = walk;
-exports.windowBounds = windowBounds;
+})
+exports.RangeObject = void 0
+exports.blob2base64 = blob2base64
+exports.borders = borders
+exports.bounds = bounds
+exports.createBase64Url = createBase64Url
+exports.createBlob = createBlob
+exports.createBlobUrl = createBlobUrl
+exports.defaults = defaults
+exports.defer = defer
+exports.documentHeight = documentHeight
+exports.extend = extend
+exports.filterChildren = filterChildren
+exports.findChildren = findChildren
+exports.getParentByTagName = getParentByTagName
+exports.indexOfElementNode = indexOfElementNode
+exports.indexOfNode = indexOfNode
+exports.indexOfSorted = indexOfSorted
+exports.indexOfTextNode = indexOfTextNode
+exports.insert = insert
+exports.isElement = isElement
+exports.isFloat = isFloat
+exports.isNumber = isNumber
+exports.isXml = isXml
+exports.locationOf = locationOf
+exports.nodeBounds = nodeBounds
+exports.parents = parents
+exports.parse = parse
+exports.prefixed = prefixed
+exports.qs = qs
+exports.qsa = qsa
+exports.qsp = qsp
+exports.querySelectorByType = querySelectorByType
+exports.requestAnimationFrame = void 0
+exports.revokeBlobUrl = revokeBlobUrl
+exports.sprint = sprint
+exports.treeWalker = treeWalker
+exports.type = type
+exports.uuid = uuid
+exports.walk = walk
+exports.windowBounds = windowBounds
 
-var _xmldom = require("@xmldom/xmldom");
+var _xmldom = require('@xmldom/xmldom')
 
 /**
  * Core Utilities and Helpers
  * @module Core
-*/
+ */
 
 /**
  * Vendor prefixed requestAnimationFrame
  * @returns {function} requestAnimationFrame
  * @memberof Core
  */
-const requestAnimationFrame = typeof window != "undefined" ? window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame : false;
-exports.requestAnimationFrame = requestAnimationFrame;
-const ELEMENT_NODE = 1;
-const TEXT_NODE = 3;
-const COMMENT_NODE = 8;
-const DOCUMENT_NODE = 9;
+const requestAnimationFrame =
+  typeof window != 'undefined'
+    ? window.requestAnimationFrame ||
+      window.mozRequestAnimationFrame ||
+      window.webkitRequestAnimationFrame ||
+      window.msRequestAnimationFrame
+    : false
+exports.requestAnimationFrame = requestAnimationFrame
+const ELEMENT_NODE = 1
+const TEXT_NODE = 3
+const COMMENT_NODE = 8
+const DOCUMENT_NODE = 9
 
-const _URL = typeof URL != "undefined" ? URL : typeof window != "undefined" ? window.URL || window.webkitURL || window.mozURL : undefined;
+const _URL =
+  typeof URL != 'undefined'
+    ? URL
+    : typeof window != 'undefined'
+      ? window.URL || window.webkitURL || window.mozURL
+      : undefined
 /**
  * Generates a UUID
  * based on: http://stackoverflow.com/questions/105034/how-to-create-a-guid-uuid-in-javascript
@@ -71,15 +82,14 @@ const _URL = typeof URL != "undefined" ? URL : typeof window != "undefined" ? wi
  * @memberof Core
  */
 
-
 function uuid() {
-  var d = new Date().getTime();
-  var uuid = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
-    var r = (d + Math.random() * 16) % 16 | 0;
-    d = Math.floor(d / 16);
-    return (c == "x" ? r : r & 0x7 | 0x8).toString(16);
-  });
-  return uuid;
+  var d = new Date().getTime()
+  var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    var r = (d + Math.random() * 16) % 16 | 0
+    d = Math.floor(d / 16)
+    return (c == 'x' ? r : (r & 0x7) | 0x8).toString(16)
+  })
+  return uuid
 }
 /**
  * Gets the height of a document
@@ -87,9 +97,14 @@ function uuid() {
  * @memberof Core
  */
 
-
 function documentHeight() {
-  return Math.max(document.documentElement.clientHeight, document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight, document.documentElement.offsetHeight);
+  return Math.max(
+    document.documentElement.clientHeight,
+    document.body.scrollHeight,
+    document.documentElement.scrollHeight,
+    document.body.offsetHeight,
+    document.documentElement.offsetHeight
+  )
 }
 /**
  * Checks if a node is an element
@@ -98,19 +113,17 @@ function documentHeight() {
  * @memberof Core
  */
 
-
 function isElement(obj) {
-  return !!(obj && obj.nodeType == 1);
+  return !!(obj && obj.nodeType == 1)
 }
 /**
  * @param {any} n
  * @returns {boolean}
  * @memberof Core
  */
-
 
 function isNumber(n) {
-  return !isNaN(parseFloat(n)) && isFinite(n);
+  return !isNaN(parseFloat(n)) && isFinite(n)
 }
 /**
  * @param {any} n
@@ -118,19 +131,18 @@ function isNumber(n) {
  * @memberof Core
  */
 
-
 function isFloat(n) {
-  let f = parseFloat(n);
+  let f = parseFloat(n)
 
   if (isNumber(n) === false) {
-    return false;
+    return false
   }
 
-  if (typeof n === "string" && n.indexOf(".") > -1) {
-    return true;
+  if (typeof n === 'string' && n.indexOf('.') > -1) {
+    return true
   }
 
-  return Math.floor(f) !== f;
+  return Math.floor(f) !== f
 }
 /**
  * Get a prefixed css property
@@ -139,24 +151,23 @@ function isFloat(n) {
  * @memberof Core
  */
 
-
 function prefixed(unprefixed) {
-  var vendors = ["Webkit", "webkit", "Moz", "O", "ms"];
-  var prefixes = ["-webkit-", "-webkit-", "-moz-", "-o-", "-ms-"];
-  var lower = unprefixed.toLowerCase();
-  var length = vendors.length;
+  var vendors = ['Webkit', 'webkit', 'Moz', 'O', 'ms']
+  var prefixes = ['-webkit-', '-webkit-', '-moz-', '-o-', '-ms-']
+  var lower = unprefixed.toLowerCase()
+  var length = vendors.length
 
-  if (typeof document === "undefined" || typeof document.body.style[lower] != "undefined") {
-    return unprefixed;
+  if (typeof document === 'undefined' || typeof document.body.style[lower] != 'undefined') {
+    return unprefixed
   }
 
   for (var i = 0; i < length; i++) {
-    if (typeof document.body.style[prefixes[i] + lower] != "undefined") {
-      return prefixes[i] + lower;
+    if (typeof document.body.style[prefixes[i] + lower] != 'undefined') {
+      return prefixes[i] + lower
     }
   }
 
-  return unprefixed;
+  return unprefixed
 }
 /**
  * Apply defaults to an object
@@ -165,17 +176,16 @@ function prefixed(unprefixed) {
  * @memberof Core
  */
 
-
 function defaults(obj) {
   for (var i = 1, length = arguments.length; i < length; i++) {
-    var source = arguments[i];
+    var source = arguments[i]
 
     for (var prop in source) {
-      if (obj[prop] === void 0) obj[prop] = source[prop];
+      if (obj[prop] === void 0) obj[prop] = source[prop]
     }
   }
 
-  return obj;
+  return obj
 }
 /**
  * Extend properties of an object
@@ -184,16 +194,15 @@ function defaults(obj) {
  * @memberof Core
  */
 
-
 function extend(target) {
-  var sources = [].slice.call(arguments, 1);
+  var sources = [].slice.call(arguments, 1)
   sources.forEach(function (source) {
-    if (!source) return;
+    if (!source) return
     Object.getOwnPropertyNames(source).forEach(function (propName) {
-      Object.defineProperty(target, propName, Object.getOwnPropertyDescriptor(source, propName));
-    });
-  });
-  return target;
+      Object.defineProperty(target, propName, Object.getOwnPropertyDescriptor(source, propName))
+    })
+  })
+  return target
 }
 /**
  * Fast quicksort insert for sorted array -- based on:
@@ -205,11 +214,10 @@ function extend(target) {
  * @memberof Core
  */
 
-
 function insert(item, array, compareFunction) {
-  var location = locationOf(item, array, compareFunction);
-  array.splice(location, 0, item);
-  return location;
+  var location = locationOf(item, array, compareFunction)
+  array.splice(location, 0, item)
+  return location
 }
 /**
  * Finds where something would fit into a sorted array
@@ -222,39 +230,38 @@ function insert(item, array, compareFunction) {
  * @memberof Core
  */
 
-
 function locationOf(item, array, compareFunction, _start, _end) {
-  var start = _start || 0;
-  var end = _end || array.length;
-  var pivot = parseInt(start + (end - start) / 2);
-  var compared;
+  var start = _start || 0
+  var end = _end || array.length
+  var pivot = parseInt(start + (end - start) / 2)
+  var compared
 
   if (!compareFunction) {
     compareFunction = function (a, b) {
-      if (a > b) return 1;
-      if (a < b) return -1;
-      if (a == b) return 0;
-    };
+      if (a > b) return 1
+      if (a < b) return -1
+      if (a == b) return 0
+    }
   }
 
   if (end - start <= 0) {
-    return pivot;
+    return pivot
   }
 
-  compared = compareFunction(array[pivot], item);
+  compared = compareFunction(array[pivot], item)
 
   if (end - start === 1) {
-    return compared >= 0 ? pivot : pivot + 1;
+    return compared >= 0 ? pivot : pivot + 1
   }
 
   if (compared === 0) {
-    return pivot;
+    return pivot
   }
 
   if (compared === -1) {
-    return locationOf(item, array, compareFunction, pivot, end);
+    return locationOf(item, array, compareFunction, pivot, end)
   } else {
-    return locationOf(item, array, compareFunction, start, pivot);
+    return locationOf(item, array, compareFunction, start, pivot)
   }
 }
 /**
@@ -269,39 +276,38 @@ function locationOf(item, array, compareFunction, _start, _end) {
  * @memberof Core
  */
 
-
 function indexOfSorted(item, array, compareFunction, _start, _end) {
-  var start = _start || 0;
-  var end = _end || array.length;
-  var pivot = parseInt(start + (end - start) / 2);
-  var compared;
+  var start = _start || 0
+  var end = _end || array.length
+  var pivot = parseInt(start + (end - start) / 2)
+  var compared
 
   if (!compareFunction) {
     compareFunction = function (a, b) {
-      if (a > b) return 1;
-      if (a < b) return -1;
-      if (a == b) return 0;
-    };
+      if (a > b) return 1
+      if (a < b) return -1
+      if (a == b) return 0
+    }
   }
 
   if (end - start <= 0) {
-    return -1; // Not found
+    return -1 // Not found
   }
 
-  compared = compareFunction(array[pivot], item);
+  compared = compareFunction(array[pivot], item)
 
   if (end - start === 1) {
-    return compared === 0 ? pivot : -1;
+    return compared === 0 ? pivot : -1
   }
 
   if (compared === 0) {
-    return pivot; // Found
+    return pivot // Found
   }
 
   if (compared === -1) {
-    return indexOfSorted(item, array, compareFunction, pivot, end);
+    return indexOfSorted(item, array, compareFunction, pivot, end)
   } else {
-    return indexOfSorted(item, array, compareFunction, start, pivot);
+    return indexOfSorted(item, array, compareFunction, start, pivot)
   }
 }
 /**
@@ -312,23 +318,38 @@ function indexOfSorted(item, array, compareFunction, _start, _end) {
  * @memberof Core
  */
 
-
 function bounds(el) {
-  var style = window.getComputedStyle(el);
-  var widthProps = ["width", "paddingRight", "paddingLeft", "marginRight", "marginLeft", "borderRightWidth", "borderLeftWidth"];
-  var heightProps = ["height", "paddingTop", "paddingBottom", "marginTop", "marginBottom", "borderTopWidth", "borderBottomWidth"];
-  var width = 0;
-  var height = 0;
+  var style = window.getComputedStyle(el)
+  var widthProps = [
+    'width',
+    'paddingRight',
+    'paddingLeft',
+    'marginRight',
+    'marginLeft',
+    'borderRightWidth',
+    'borderLeftWidth'
+  ]
+  var heightProps = [
+    'height',
+    'paddingTop',
+    'paddingBottom',
+    'marginTop',
+    'marginBottom',
+    'borderTopWidth',
+    'borderBottomWidth'
+  ]
+  var width = 0
+  var height = 0
   widthProps.forEach(function (prop) {
-    width += parseFloat(style[prop]) || 0;
-  });
+    width += parseFloat(style[prop]) || 0
+  })
   heightProps.forEach(function (prop) {
-    height += parseFloat(style[prop]) || 0;
-  });
+    height += parseFloat(style[prop]) || 0
+  })
   return {
     height: height,
     width: width
-  };
+  }
 }
 /**
  * Find the bounds of an element
@@ -338,23 +359,36 @@ function bounds(el) {
  * @memberof Core
  */
 
-
 function borders(el) {
-  var style = window.getComputedStyle(el);
-  var widthProps = ["paddingRight", "paddingLeft", "marginRight", "marginLeft", "borderRightWidth", "borderLeftWidth"];
-  var heightProps = ["paddingTop", "paddingBottom", "marginTop", "marginBottom", "borderTopWidth", "borderBottomWidth"];
-  var width = 0;
-  var height = 0;
+  var style = window.getComputedStyle(el)
+  var widthProps = [
+    'paddingRight',
+    'paddingLeft',
+    'marginRight',
+    'marginLeft',
+    'borderRightWidth',
+    'borderLeftWidth'
+  ]
+  var heightProps = [
+    'paddingTop',
+    'paddingBottom',
+    'marginTop',
+    'marginBottom',
+    'borderTopWidth',
+    'borderBottomWidth'
+  ]
+  var width = 0
+  var height = 0
   widthProps.forEach(function (prop) {
-    width += parseFloat(style[prop]) || 0;
-  });
+    width += parseFloat(style[prop]) || 0
+  })
   heightProps.forEach(function (prop) {
-    height += parseFloat(style[prop]) || 0;
-  });
+    height += parseFloat(style[prop]) || 0
+  })
   return {
     height: height,
     width: width
-  };
+  }
 }
 /**
  * Find the bounds of any node
@@ -364,20 +398,19 @@ function borders(el) {
  * @memberof Core
  */
 
-
 function nodeBounds(node) {
-  let elPos;
-  let doc = node.ownerDocument;
+  let elPos
+  let doc = node.ownerDocument
 
   if (node.nodeType == Node.TEXT_NODE) {
-    let elRange = doc.createRange();
-    elRange.selectNodeContents(node);
-    elPos = elRange.getBoundingClientRect();
+    let elRange = doc.createRange()
+    elRange.selectNodeContents(node)
+    elPos = elRange.getBoundingClientRect()
   } else {
-    elPos = node.getBoundingClientRect();
+    elPos = node.getBoundingClientRect()
   }
 
-  return elPos;
+  return elPos
 }
 /**
  * Find the equivalent of getBoundingClientRect of a browser window
@@ -385,10 +418,9 @@ function nodeBounds(node) {
  * @memberof Core
  */
 
-
 function windowBounds() {
-  var width = window.innerWidth;
-  var height = window.innerHeight;
+  var width = window.innerWidth
+  var height = window.innerHeight
   return {
     top: 0,
     left: 0,
@@ -396,7 +428,7 @@ function windowBounds() {
     bottom: height,
     width: width,
     height: height
-  };
+  }
 }
 /**
  * Gets the index of a node in its parent
@@ -406,24 +438,23 @@ function windowBounds() {
  * @memberof Core
  */
 
-
 function indexOfNode(node, typeId) {
-  var parent = node.parentNode;
-  var children = parent.childNodes;
-  var sib;
-  var index = -1;
+  var parent = node.parentNode
+  var children = parent.childNodes
+  var sib
+  var index = -1
 
   for (var i = 0; i < children.length; i++) {
-    sib = children[i];
+    sib = children[i]
 
     if (sib.nodeType === typeId) {
-      index++;
+      index++
     }
 
-    if (sib == node) break;
+    if (sib == node) break
   }
 
-  return index;
+  return index
 }
 /**
  * Gets the index of a text node in its parent
@@ -432,9 +463,8 @@ function indexOfNode(node, typeId) {
  * @memberof Core
  */
 
-
 function indexOfTextNode(textNode) {
-  return indexOfNode(textNode, TEXT_NODE);
+  return indexOfNode(textNode, TEXT_NODE)
 }
 /**
  * Gets the index of an element node in its parent
@@ -443,9 +473,8 @@ function indexOfTextNode(textNode) {
  * @memberof Core
  */
 
-
 function indexOfElementNode(elementNode) {
-  return indexOfNode(elementNode, ELEMENT_NODE);
+  return indexOfNode(elementNode, ELEMENT_NODE)
 }
 /**
  * Check if extension is xml
@@ -454,9 +483,8 @@ function indexOfElementNode(elementNode) {
  * @memberof Core
  */
 
-
 function isXml(ext) {
-  return ["xml", "opf", "ncx"].indexOf(ext) > -1;
+  return ['xml', 'opf', 'ncx'].indexOf(ext) > -1
 }
 /**
  * Create a new blob
@@ -466,11 +494,10 @@ function isXml(ext) {
  * @memberof Core
  */
 
-
 function createBlob(content, mime) {
   return new Blob([content], {
     type: mime
-  });
+  })
 }
 /**
  * Create a new blob url
@@ -480,12 +507,11 @@ function createBlob(content, mime) {
  * @memberof Core
  */
 
-
 function createBlobUrl(content, mime) {
-  var tempUrl;
-  var blob = createBlob(content, mime);
-  tempUrl = _URL.createObjectURL(blob);
-  return tempUrl;
+  var tempUrl
+  var blob = createBlob(content, mime)
+  tempUrl = _URL.createObjectURL(blob)
+  return tempUrl
 }
 /**
  * Remove a blob url
@@ -493,9 +519,8 @@ function createBlobUrl(content, mime) {
  * @memberof Core
  */
 
-
 function revokeBlobUrl(url) {
-  return _URL.revokeObjectURL(url);
+  return _URL.revokeObjectURL(url)
 }
 /**
  * Create a new base64 encoded url
@@ -505,19 +530,18 @@ function revokeBlobUrl(url) {
  * @memberof Core
  */
 
-
 function createBase64Url(content, mime) {
-  var data;
-  var datauri;
+  var data
+  var datauri
 
-  if (typeof content !== "string") {
+  if (typeof content !== 'string') {
     // Only handles strings
-    return;
+    return
   }
 
-  data = btoa(content);
-  datauri = "data:" + mime + ";base64," + data;
-  return datauri;
+  data = btoa(content)
+  datauri = 'data:' + mime + ';base64,' + data
+  return datauri
 }
 /**
  * Get type of an object
@@ -526,9 +550,8 @@ function createBase64Url(content, mime) {
  * @memberof Core
  */
 
-
 function type(obj) {
-  return Object.prototype.toString.call(obj).slice(8, -1);
+  return Object.prototype.toString.call(obj).slice(8, -1)
 }
 /**
  * Parse xml (or html) markup
@@ -539,25 +562,23 @@ function type(obj) {
  * @memberof Core
  */
 
-
 function parse(markup, mime, forceXMLDom) {
-  var doc;
-  var Parser;
+  var doc
+  var Parser
 
-  if (typeof DOMParser === "undefined" || forceXMLDom) {
-    Parser = _xmldom.DOMParser;
+  if (typeof DOMParser === 'undefined' || forceXMLDom) {
+    Parser = _xmldom.DOMParser
   } else {
-    Parser = DOMParser;
+    Parser = DOMParser
   } // Remove byte order mark before parsing
   // https://www.w3.org/International/questions/qa-byte-order-mark
 
-
-  if (markup.charCodeAt(0) === 0xFEFF) {
-    markup = markup.slice(1);
+  if (markup.charCodeAt(0) === 0xfeff) {
+    markup = markup.slice(1)
   }
 
-  doc = new Parser().parseFromString(markup, mime);
-  return doc;
+  doc = new Parser().parseFromString(markup, mime)
+  return doc
 }
 /**
  * querySelector polyfill
@@ -567,21 +588,20 @@ function parse(markup, mime, forceXMLDom) {
  * @memberof Core
  */
 
-
 function qs(el, sel) {
-  var elements;
+  var elements
 
   if (!el) {
-    throw new Error("No Element Provided");
+    throw new Error('No Element Provided')
   }
 
-  if (typeof el.querySelector != "undefined") {
-    return el.querySelector(sel);
+  if (typeof el.querySelector != 'undefined') {
+    return el.querySelector(sel)
   } else {
-    elements = el.getElementsByTagName(sel);
+    elements = el.getElementsByTagName(sel)
 
     if (elements.length) {
-      return elements[0];
+      return elements[0]
     }
   }
 }
@@ -593,12 +613,11 @@ function qs(el, sel) {
  * @memberof Core
  */
 
-
 function qsa(el, sel) {
-  if (typeof el.querySelector != "undefined") {
-    return el.querySelectorAll(sel);
+  if (typeof el.querySelector != 'undefined') {
+    return el.querySelectorAll(sel)
   } else {
-    return el.getElementsByTagName(sel);
+    return el.getElementsByTagName(sel)
   }
 }
 /**
@@ -610,33 +629,32 @@ function qsa(el, sel) {
  * @memberof Core
  */
 
-
 function qsp(el, sel, props) {
-  var q, filtered;
+  var q, filtered
 
-  if (typeof el.querySelector != "undefined") {
-    sel += "[";
+  if (typeof el.querySelector != 'undefined') {
+    sel += '['
 
     for (var prop in props) {
-      sel += prop + "~='" + props[prop] + "'";
+      sel += prop + "~='" + props[prop] + "'"
     }
 
-    sel += "]";
-    return el.querySelector(sel);
+    sel += ']'
+    return el.querySelector(sel)
   } else {
-    q = el.getElementsByTagName(sel);
+    q = el.getElementsByTagName(sel)
     filtered = Array.prototype.slice.call(q, 0).filter(function (el) {
       for (var prop in props) {
         if (el.getAttribute(prop) === props[prop]) {
-          return true;
+          return true
         }
       }
 
-      return false;
-    });
+      return false
+    })
 
     if (filtered) {
-      return filtered[0];
+      return filtered[0]
     }
   }
 }
@@ -647,19 +665,22 @@ function qsp(el, sel, props) {
  * @param  {function} func function to run on each element
  */
 
-
 function sprint(root, func) {
-  var doc = root.ownerDocument || root;
+  var doc = root.ownerDocument || root
 
-  if (typeof doc.createTreeWalker !== "undefined") {
-    treeWalker(root, func, NodeFilter.SHOW_TEXT);
+  if (typeof doc.createTreeWalker !== 'undefined') {
+    treeWalker(root, func, NodeFilter.SHOW_TEXT)
   } else {
-    walk(root, function (node) {
-      if (node && node.nodeType === 3) {
-        // Node.TEXT_NODE
-        func(node);
-      }
-    }, true);
+    walk(
+      root,
+      function (node) {
+        if (node && node.nodeType === 3) {
+          // Node.TEXT_NODE
+          func(node)
+        }
+      },
+      true
+    )
   }
 }
 /**
@@ -670,13 +691,12 @@ function sprint(root, func) {
  * @param  {function | object} filter function or object to filter with
  */
 
-
 function treeWalker(root, func, filter) {
-  var treeWalker = document.createTreeWalker(root, filter, null, false);
-  let node;
+  var treeWalker = document.createTreeWalker(root, filter, null, false)
+  let node
 
-  while (node = treeWalker.nextNode()) {
-    func(node);
+  while ((node = treeWalker.nextNode())) {
+    func(node)
   }
 }
 /**
@@ -685,24 +705,23 @@ function treeWalker(root, func, filter) {
  * @param {callback} return false for continue,true for break inside callback
  */
 
-
 function walk(node, callback) {
   if (callback(node)) {
-    return true;
+    return true
   }
 
-  node = node.firstChild;
+  node = node.firstChild
 
   if (node) {
     do {
-      let walked = walk(node, callback);
+      let walked = walk(node, callback)
 
       if (walked) {
-        return true;
+        return true
       }
 
-      node = node.nextSibling;
-    } while (node);
+      node = node.nextSibling
+    } while (node)
   }
 }
 /**
@@ -712,23 +731,21 @@ function walk(node, callback) {
  * @memberof Core
  */
 
-
 function blob2base64(blob) {
   return new Promise(function (resolve, reject) {
-    var reader = new FileReader();
-    reader.readAsDataURL(blob);
+    var reader = new FileReader()
+    reader.readAsDataURL(blob)
 
     reader.onloadend = function () {
-      resolve(reader.result);
-    };
-  });
+      resolve(reader.result)
+    }
+  })
 }
 /**
  * Creates a new pending promise and provides methods to resolve or reject it.
  * From: https://developer.mozilla.org/en-US/docs/Mozilla/JavaScript_code_modules/Promise.jsm/Deferred#backwards_forwards_compatible
  * @memberof Core
  */
-
 
 function defer() {
   /* A method to resolve the associated Promise with the value passed.
@@ -738,7 +755,7 @@ function defer() {
    * If the value is a Promise then the associated promise assumes the state
    * of Promise passed as value.
    */
-  this.resolve = null;
+  this.resolve = null
   /* A method to reject the associated Promise with the value passed.
    * If the promise is already settled it does nothing.
    *
@@ -747,17 +764,17 @@ function defer() {
    * itself will be the reason for rejection no matter the state of the Promise.
    */
 
-  this.reject = null;
-  this.id = uuid();
+  this.reject = null
+  this.id = uuid()
   /* A newly created Pomise object.
    * Initially in pending state.
    */
 
   this.promise = new Promise((resolve, reject) => {
-    this.resolve = resolve;
-    this.reject = reject;
-  });
-  Object.freeze(this);
+    this.resolve = resolve
+    this.reject = reject
+  })
+  Object.freeze(this)
 }
 /**
  * querySelector with filter by epub type
@@ -768,25 +785,26 @@ function defer() {
  * @memberof Core
  */
 
-
 function querySelectorByType(html, element, type) {
-  var query;
+  var query
 
-  if (typeof html.querySelector != "undefined") {
-    query = html.querySelector(`${element}[*|type="${type}"]`);
+  if (typeof html.querySelector != 'undefined') {
+    query = html.querySelector(`${element}[*|type="${type}"]`)
   } // Handle IE not supporting namespaced epub:type in querySelector
 
-
   if (!query || query.length === 0) {
-    query = qsa(html, element);
+    query = qsa(html, element)
 
     for (var i = 0; i < query.length; i++) {
-      if (query[i].getAttributeNS("http://www.idpf.org/2007/ops", "type") === type || query[i].getAttribute("epub:type") === type) {
-        return query[i];
+      if (
+        query[i].getAttributeNS('http://www.idpf.org/2007/ops', 'type') === type ||
+        query[i].getAttribute('epub:type') === type
+      ) {
+        return query[i]
       }
     }
   } else {
-    return query;
+    return query
   }
 }
 /**
@@ -796,20 +814,19 @@ function querySelectorByType(html, element, type) {
  * @memberof Core
  */
 
-
 function findChildren(el) {
-  var result = [];
-  var childNodes = el.childNodes;
+  var result = []
+  var childNodes = el.childNodes
 
   for (var i = 0; i < childNodes.length; i++) {
-    let node = childNodes[i];
+    let node = childNodes[i]
 
     if (node.nodeType === 1) {
-      result.push(node);
+      result.push(node)
     }
   }
 
-  return result;
+  return result
 }
 /**
  * Find all parents (ancestors) of an element
@@ -818,15 +835,14 @@ function findChildren(el) {
  * @memberof Core
  */
 
-
 function parents(node) {
-  var nodes = [node];
+  var nodes = [node]
 
   for (; node; node = node.parentNode) {
-    nodes.unshift(node);
+    nodes.unshift(node)
   }
 
-  return nodes;
+  return nodes
 }
 /**
  * Find all direct descendents of a specific type
@@ -837,25 +853,24 @@ function parents(node) {
  * @memberof Core
  */
 
-
 function filterChildren(el, nodeName, single) {
-  var result = [];
-  var childNodes = el.childNodes;
+  var result = []
+  var childNodes = el.childNodes
 
   for (var i = 0; i < childNodes.length; i++) {
-    let node = childNodes[i];
+    let node = childNodes[i]
 
     if (node.nodeType === 1 && node.nodeName.toLowerCase() === nodeName) {
       if (single) {
-        return node;
+        return node
       } else {
-        result.push(node);
+        result.push(node)
       }
     }
   }
 
   if (!single) {
-    return result;
+    return result
   }
 }
 /**
@@ -866,18 +881,17 @@ function filterChildren(el, nodeName, single) {
  * @memberof Core
  */
 
-
 function getParentByTagName(node, tagname) {
-  let parent;
-  if (node === null || tagname === '') return;
-  parent = node.parentNode;
+  let parent
+  if (node === null || tagname === '') return
+  parent = node.parentNode
 
   while (parent.nodeType === 1) {
     if (parent.tagName.toLowerCase() === tagname) {
-      return parent;
+      return parent
     }
 
-    parent = parent.parentNode;
+    parent = parent.parentNode
   }
 }
 /**
@@ -886,95 +900,95 @@ function getParentByTagName(node, tagname) {
  * @memberof Core
  */
 
-
 class RangeObject {
   constructor() {
-    this.collapsed = false;
-    this.commonAncestorContainer = undefined;
-    this.endContainer = undefined;
-    this.endOffset = undefined;
-    this.startContainer = undefined;
-    this.startOffset = undefined;
+    this.collapsed = false
+    this.commonAncestorContainer = undefined
+    this.endContainer = undefined
+    this.endOffset = undefined
+    this.startContainer = undefined
+    this.startOffset = undefined
   }
 
   setStart(startNode, startOffset) {
-    this.startContainer = startNode;
-    this.startOffset = startOffset;
+    this.startContainer = startNode
+    this.startOffset = startOffset
 
     if (!this.endContainer) {
-      this.collapse(true);
+      this.collapse(true)
     } else {
-      this.commonAncestorContainer = this._commonAncestorContainer();
+      this.commonAncestorContainer = this._commonAncestorContainer()
     }
 
-    this._checkCollapsed();
+    this._checkCollapsed()
   }
 
   setEnd(endNode, endOffset) {
-    this.endContainer = endNode;
-    this.endOffset = endOffset;
+    this.endContainer = endNode
+    this.endOffset = endOffset
 
     if (!this.startContainer) {
-      this.collapse(false);
+      this.collapse(false)
     } else {
-      this.collapsed = false;
-      this.commonAncestorContainer = this._commonAncestorContainer();
+      this.collapsed = false
+      this.commonAncestorContainer = this._commonAncestorContainer()
     }
 
-    this._checkCollapsed();
+    this._checkCollapsed()
   }
 
   collapse(toStart) {
-    this.collapsed = true;
+    this.collapsed = true
 
     if (toStart) {
-      this.endContainer = this.startContainer;
-      this.endOffset = this.startOffset;
-      this.commonAncestorContainer = this.startContainer.parentNode;
+      this.endContainer = this.startContainer
+      this.endOffset = this.startOffset
+      this.commonAncestorContainer = this.startContainer.parentNode
     } else {
-      this.startContainer = this.endContainer;
-      this.startOffset = this.endOffset;
-      this.commonAncestorContainer = this.endOffset.parentNode;
+      this.startContainer = this.endContainer
+      this.startOffset = this.endOffset
+      this.commonAncestorContainer = this.endOffset.parentNode
     }
   }
 
   selectNode(referenceNode) {
-    let parent = referenceNode.parentNode;
-    let index = Array.prototype.indexOf.call(parent.childNodes, referenceNode);
-    this.setStart(parent, index);
-    this.setEnd(parent, index + 1);
+    let parent = referenceNode.parentNode
+    let index = Array.prototype.indexOf.call(parent.childNodes, referenceNode)
+    this.setStart(parent, index)
+    this.setEnd(parent, index + 1)
   }
 
   selectNodeContents(referenceNode) {
-    let end = referenceNode.childNodes[referenceNode.childNodes - 1];
-    let endIndex = referenceNode.nodeType === 3 ? referenceNode.textContent.length : parent.childNodes.length;
-    this.setStart(referenceNode, 0);
-    this.setEnd(referenceNode, endIndex);
+    let end = referenceNode.childNodes[referenceNode.childNodes - 1]
+    let endIndex =
+      referenceNode.nodeType === 3 ? referenceNode.textContent.length : parent.childNodes.length
+    this.setStart(referenceNode, 0)
+    this.setEnd(referenceNode, endIndex)
   }
 
   _commonAncestorContainer(startContainer, endContainer) {
-    var startParents = parents(startContainer || this.startContainer);
-    var endParents = parents(endContainer || this.endContainer);
-    if (startParents[0] != endParents[0]) return undefined;
+    var startParents = parents(startContainer || this.startContainer)
+    var endParents = parents(endContainer || this.endContainer)
+    if (startParents[0] != endParents[0]) return undefined
 
     for (var i = 0; i < startParents.length; i++) {
       if (startParents[i] != endParents[i]) {
-        return startParents[i - 1];
+        return startParents[i - 1]
       }
     }
   }
 
   _checkCollapsed() {
     if (this.startContainer === this.endContainer && this.startOffset === this.endOffset) {
-      this.collapsed = true;
+      this.collapsed = true
     } else {
-      this.collapsed = false;
+      this.collapsed = false
     }
   }
 
-  toString() {// TODO: implement walking between start and end to find text
+  toString() {
+    // TODO: implement walking between start and end to find text
   }
-
 }
 
-exports.RangeObject = RangeObject;
+exports.RangeObject = RangeObject
