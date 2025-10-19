@@ -1412,19 +1412,12 @@ class Rendition {
   _hasNextPageInCurrentSection(currentView, currentSection) {
     // Use page numbers from location data
     if (!currentSection.pages || !currentSection.totalPages) {
-      console.log('_hasNextPageInCurrentSection: No pages or totalPages data')
       return false
     }
 
     // Check if current page is less than total pages
     const currentPage = currentSection.pages[currentSection.pages.length - 1]
     const hasNext = currentPage < currentSection.totalPages
-
-    console.log('_hasNextPageInCurrentSection:', {
-      currentPage,
-      totalPages: currentSection.totalPages,
-      hasNext
-    })
 
     return hasNext
   }
@@ -1439,7 +1432,6 @@ class Rendition {
     const nextSection = currentView.section.next()
 
     if (!nextSection) {
-      console.log('_getFirstPageParagraphsInNextSection: No next section available')
       return [] // No next section available
     }
 
@@ -1450,7 +1442,6 @@ class Rendition {
       // The next section is not loaded as a view yet
       // Load the section content directly without creating a view
       try {
-        console.log('_getFirstPageParagraphsInNextSection: Loading next section')
         // Load the section content directly using the book's load method with timeout
         const loadPromise = nextSection.load(this.book.load.bind(this.book))
         const timeoutPromise = new Promise((_, reject) =>
@@ -1498,11 +1489,7 @@ class Rendition {
 
         // Extract paragraphs from the range
         const paragraphs = this._getParagraphsFromRange(range, contents)
-        console.log(
-          '_getFirstPageParagraphsInNextSection: Found',
-          paragraphs.length,
-          'paragraphs in loaded section'
-        )
+
         return paragraphs
       } catch (e) {
         console.error('Error loading next section content:', e)
@@ -1516,7 +1503,6 @@ class Rendition {
     }
 
     try {
-      console.log('_getFirstPageParagraphsInNextSection: Using already loaded view')
       // Get the first page mapping instead of the entire section
       const firstPageMapping = this._getFirstPageMapping(nextView.contents, nextView.section)
 
@@ -1542,11 +1528,7 @@ class Rendition {
 
       // Extract paragraphs from the range
       const paragraphs = this._getParagraphsFromRange(range, nextView.contents)
-      console.log(
-        '_getFirstPageParagraphsInNextSection: Found',
-        paragraphs.length,
-        'paragraphs in existing view'
-      )
+
       return paragraphs
     } catch (e) {
       console.error('Error extracting paragraphs from next view:', e)
@@ -1701,19 +1683,12 @@ class Rendition {
   _hasPreviousPageInCurrentSection(currentView, currentSection) {
     // Use page numbers from location data
     if (!currentSection.pages || !currentSection.totalPages) {
-      console.log('_hasPreviousPageInCurrentSection: No pages or totalPages data')
       return false
     }
 
     // Check if current page is greater than 1
     const currentPage = currentSection.pages[0] // First page in the current view
     const hasPrevious = currentPage > 1
-
-    console.log('_hasPreviousPageInCurrentSection:', {
-      currentPage,
-      totalPages: currentSection.totalPages,
-      hasPrevious
-    })
 
     return hasPrevious
   }
@@ -1728,7 +1703,6 @@ class Rendition {
     const previousSection = currentView.section.prev()
 
     if (!previousSection) {
-      console.log('_getLastPageParagraphsInPreviousSection: No previous section available')
       return [] // No previous section available
     }
 
@@ -1739,7 +1713,6 @@ class Rendition {
       // The previous section is not loaded as a view yet
       // Load the section content directly without creating a view
       try {
-        console.log('_getLastPageParagraphsInPreviousSection: Loading previous section')
         // Load the section content directly using the book's load method with timeout
         const loadPromise = previousSection.load(this.book.load.bind(this.book))
         const timeoutPromise = new Promise((_, reject) =>
@@ -1792,11 +1765,7 @@ class Rendition {
 
         // Extract paragraphs from the range
         const paragraphs = this._getParagraphsFromRange(range, contents)
-        console.log(
-          '_getLastPageParagraphsInPreviousSection: Found',
-          paragraphs.length,
-          'paragraphs in loaded section'
-        )
+
         return paragraphs
       } catch (e) {
         console.error('Error loading previous section content:', e)
@@ -1810,7 +1779,6 @@ class Rendition {
     }
 
     try {
-      console.log('_getLastPageParagraphsInPreviousSection: Using already loaded view')
       // Get the last page mapping instead of the entire section
       const lastPageMapping = this._getLastPageMapping(previousView.contents, previousView.section)
 
@@ -1836,11 +1804,7 @@ class Rendition {
 
       // Extract paragraphs from the range
       const paragraphs = this._getParagraphsFromRange(range, previousView.contents)
-      console.log(
-        '_getLastPageParagraphsInPreviousSection: Found',
-        paragraphs.length,
-        'paragraphs in existing view'
-      )
+
       return paragraphs
     } catch (e) {
       console.error('Error extracting paragraphs from previous view:', e)
@@ -1889,31 +1853,21 @@ class Rendition {
     try {
       // Get the full text from the range (same as getCurrentViewText)
       const fullText = range.toString()
-      console.log(
-        '_getParagraphsFromRange: Starting extraction, text length:',
-        fullText.length,
-        'preview:',
-        fullText.substring(0, 100)
-      )
 
       if (!fullText.trim()) {
-        console.log('_getParagraphsFromRange: No text in range')
         return []
       }
 
       // Get the document from the range
       const document = range.commonAncestorContainer.ownerDocument
       if (!document) {
-        console.log('_getParagraphsFromRange: No document found')
         return []
       }
 
       // Find all text nodes within the range
       const textNodes = this._getTextNodesInRange(range)
-      console.log('_getParagraphsFromRange: Found text nodes:', textNodes.length)
 
       if (textNodes.length === 0) {
-        console.log('_getParagraphsFromRange: No text nodes in range')
         return []
       }
 
@@ -1929,8 +1883,6 @@ class Rendition {
           blockElementToTextNodes.get(blockElement).push(textNode)
         }
       }
-
-      console.log('_getParagraphsFromRange: Block elements found:', blockElementToTextNodes.size)
 
       // Create paragraphs from grouped text nodes
       for (const [blockElement, textNodes] of blockElementToTextNodes) {
@@ -2065,7 +2017,6 @@ class Rendition {
 
       // Fallback: if no paragraphs found but we have text, create one paragraph from entire range
       if (paragraphs.length === 0 && fullText.trim()) {
-        console.log('_getParagraphsFromRange: No block elements found, using fallback extraction')
         try {
           const cfi = new EpubCFI(range, contents.cfiBase, this.settings.ignoreClass)
           const cfiString = cfi.toString()
@@ -2080,7 +2031,6 @@ class Rendition {
         }
       }
 
-      console.log('_getParagraphsFromRange: Returning', paragraphs.length, 'paragraphs')
       return paragraphs
     } catch (e) {
       console.error('Error getting paragraphs from range:', e)

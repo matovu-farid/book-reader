@@ -4,7 +4,7 @@ import { createLazyFileRoute, Link } from '@tanstack/react-router'
 import { ReactReader } from '@renderer/components/react-reader'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-toastify'
-import { Book, ParagraphWithCFI } from 'src/shared/types'
+import { Book } from 'src/shared/types'
 import { useEffect, useRef, useState } from 'react'
 import { Button, FormControlLabel, IconButton, Radio, RadioGroup } from '@mui/material'
 import { Rendition } from '@epubjs'
@@ -15,9 +15,7 @@ import { themes } from '@renderer/themes/themes'
 import createIReactReaderTheme from '@renderer/themes/readerThemes'
 import { ThemeProvider, THEME_ID, createTheme } from '@mui/material/styles'
 import PaletteIcon from '@mui/icons-material/Palette'
-import { useTTS } from '@renderer/hooks/useTTS'
 import { TTSControls } from '@renderer/components/TTSControls'
-import { PlayingState, useTTSStore } from '@renderer/stores/ttsStore'
 
 export const Route = createLazyFileRoute('/books/$id')({
   component: () => <BookView />
@@ -91,29 +89,28 @@ function BookView(): JSX.Element {
       queryClient.invalidateQueries({ queryKey: ['pageView'] })
     }
   })
-  const { setToLastParagraphIndex } = useTTSStore()
 
   // TTS hook - use state variable instead of ref
-  const tts = useTTS({
-    bookId: book?.id || '',
-    rendition: renditionState,
-    onNavigateToPreviousPage: (playingState: PlayingState) => {
-      // Navigate to previous page
-      if (rendition.current) {
-        rendition.current.prev().then(() => {
-          if (playingState === PlayingState.Playing) {
-            setToLastParagraphIndex()
-          }
-        })
-      }
-    },
-    onNavigateToNextPage: () => {
-      // Navigate to next page
-      if (rendition.current) {
-        rendition.current.next()
-      }
-    }
-  })
+  // const tts = useTTS({
+  //   bookId: book?.id || '',
+  //   rendition: renditionState,
+  //   onNavigateToPreviousPage: (playingState: PlayingState) => {
+  //     // Navigate to previous page
+  //     if (rendition.current) {
+  //       rendition.current.prev().then(() => {
+  //         if (playingState === PlayingState.Playing) {
+  //           setToLastParagraphIndex()
+  //         }
+  //       })
+  //     }
+  //   },
+  //   onNavigateToNextPage: () => {
+  //     // Navigate to next page
+  //     if (rendition.current) {
+  //       rendition.current.next()
+  //     }
+  //   }
+  // })
 
   // Update rendition state when ref becomes available
   useEffect(() => {
@@ -121,25 +118,6 @@ function BookView(): JSX.Element {
       setRenditionState(rendition.current)
     }
   }, [renditionState])
-
-  // Handle paragraph extraction for TTS
-  const handlePageParagraphsExtracted = (data: { paragraphs: ParagraphWithCFI[] }) => {
-    if (data.paragraphs.length > 0) {
-      tts.setParagraphs(data.paragraphs)
-    }
-  }
-
-  // Handle next page paragraphs extraction and logging
-  const handleNextPageParagraphs = (data: { paragraphs: ParagraphWithCFI[] }) => {
-    console.log('Next page paragraphs extracted:', data.paragraphs)
-    // You can add additional logic here to process the next page paragraphs
-  }
-
-  // Handle previous page paragraphs extraction and logging
-  const handlePreviousPageParagraphs = (data: { paragraphs: ParagraphWithCFI[] }) => {
-    console.log('Previous page paragraphs extracted:', data.paragraphs)
-    // You can add additional logic here to process the previous page paragraphs
-  }
 
   if (isError) return <div className="w-full h-full place-items-center grid"> {error.message}</div>
   if (isPending)
@@ -191,9 +169,6 @@ function BookView(): JSX.Element {
                 <Loader />
               </div>
             }
-            onPageParagraphsExtracted={handlePageParagraphsExtracted}
-            onNextPageParagraphs={handleNextPageParagraphs}
-            onPreviousPageParagraphs={handlePreviousPageParagraphs}
             url={book.epubUrl}
             title={book.title}
             location={book.currentBookId || 0}
@@ -212,7 +187,7 @@ function BookView(): JSX.Element {
 
         {/* TTS Controls - Bottom Center */}
         <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-50">
-          <TTSControls tts={tts} />
+          {renditionState && <TTSControls bookId={book.id} rendition={renditionState} />}
         </div>
       </div>
     </ThemeProvider>

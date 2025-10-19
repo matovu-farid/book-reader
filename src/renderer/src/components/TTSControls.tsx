@@ -10,59 +10,75 @@ import {
   Close as CloseIcon
 } from '@mui/icons-material'
 import { useState } from 'react'
-import type { TTSControls as TTSControlsType } from '../hooks/useTTS'
 import { PlayingState } from '@renderer/stores/ttsStore'
+import { Player } from '@renderer/models/Player'
+import { Rendition } from '@renderer/epubjs/types'
 
 interface TTSControlsProps {
-  tts: TTSControlsType
+  bookId: string
+  rendition: Rendition
   disabled?: boolean
 }
 
-export function TTSControls({ tts, disabled = false }: TTSControlsProps) {
-  const { state } = tts
-  const { paragraphs, hasApiKey, error, playingState } = state
+export function TTSControls({ bookId, rendition, disabled = false }: TTSControlsProps) {
+  // const tts = useTTS({
+  //   bookId: book?.id || '',
+  //   rendition: renditionState,
+  //   onNavigateToPreviousPage: (playingState: PlayingState) => {
+  //     // Navigate to previous page
+  //     if (rendition.current) {
+  //       rendition.current.prev().then(() => {
+  //         if (playingState === PlayingState.Playing) {
+  //           setToLastParagraphIndex()
+  //         }
+  //       })
+  //     }
+  //   },
+  //   onNavigateToNextPage: () => {
+  //     // Navigate to next page
+  //     if (rendition.current) {
+  //       rendition.current.next()
+  //     }
+  //   }
+  // })
   const [showError, setShowError] = useState(false)
+  const [errors, setErrors] = useState<string[]>([])
+
+  const error = errors.join('\n')
+  const [player, _] = useState<Player>(new Player(rendition, bookId))
+  const playingState = player.getPlayingState()
 
   // Show error snackbar when error occurs
   const handleErrorClose = () => {
     setShowError(false)
     // Clear error from store
-    tts.state.error && tts.state.error === error && setShowError(false)
+    if (player) {
+      player.cleanup()
+    }
   }
-
-  // Show error when it changes
-  if (error && !showError) {
+  if (player.getErrors().length !== 0) {
     setShowError(true)
-  }
-
-  // Don't render if no API key or no paragraphs
-  if (!hasApiKey || paragraphs.length === 0) {
-    return null
+    setErrors(player.getErrors())
   }
 
   const handlePlay = () => {
-    if (playingState === PlayingState.Paused) {
-      tts.resume()
-    } else if (playingState === PlayingState.Playing) {
-      tts.pause()
-    } else {
-      tts.play()
-    }
+    return player.play()
   }
 
   const handleStop = () => {
-    tts.stop()
+    player.stop()
   }
 
   const handlePrev = () => {
-    tts.prev()
+    player.prev()
   }
 
   const handleNext = () => {
-    tts.next()
+    player.next()
   }
 
   const getPlayIcon = () => {
+    const playingState = player.getPlayingState()
     if (playingState === PlayingState.Loading) {
       return <CircularProgress size={24} color="inherit" />
     }
@@ -197,7 +213,7 @@ export function TTSControls({ tts, disabled = false }: TTSControlsProps) {
         </Tooltip>
 
         {/* Error Icon (if there's an error) */}
-        {error && (
+        {errors.length > 0 && (
           <ErrorIcon
             sx={{
               fontSize: 20,
