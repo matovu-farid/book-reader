@@ -63,28 +63,20 @@ export const useTTSStore = create<TTSState>()(
       setHasApiKey: (hasKey) => set({ hasApiKey: hasKey }),
       setError: (error) => set({ error }),
 
-      setCurrentParagraphIndex: (index) => {
-        const state = get()
-        if (index >= 0 && index < state.paragraphs.length) {
-          set({ currentParagraphIndex: index })
-        } else {
-          console.warn(
-            `Invalid paragraph index ${index}. Valid range: 0-${state.paragraphs.length - 1}`
-          )
-        }
-      },
-      setToLastParagraphIndex: () => {
-        const state = get()
-        set({ currentParagraphIndex: state.paragraphs.length - 1 })
-      },
-
-      setParagraphs: (paragraphs) =>
-        set({
-          paragraphs: [...paragraphs], // Create a shallow copy
-          // currentParagraphIndex: get().direction === 'forward' ? 0 : paragraphs.length - 1,
-          playingState: PlayingState.Stopped,
-          error: null
-        }),
+      // setCurrentParagraphIndex: (index) => {
+      //   const state = get()
+      //   if (index >= 0 && index < state.paragraphs.length) {
+      //     set({ currentParagraphIndex: index })
+      //   } else {
+      //     console.warn(
+      //       `Invalid paragraph index ${index}. Valid range: 0-${state.paragraphs.length - 1}`
+      //     )
+      //   }
+      // },
+      // setToLastParagraphIndex: () => {
+      //   const state = get()
+      //   set({ currentParagraphIndex: state.paragraphs.length - 1 })
+      // },
 
       setCurrentBookId: (bookId) => {
         const state = get()
@@ -101,12 +93,12 @@ export const useTTSStore = create<TTSState>()(
         }
       },
 
-      setCurrentPage: (page) => {
-        const state = get()
-        if (state.currentPage !== page) {
-          set({ currentPage: page })
-        }
-      },
+      // setCurrentPage: (page) => {
+      //   const state = get()
+      //   if (state.currentPage !== page) {
+      //     set({ currentPage: page })
+      //   }
+      // },
 
       addToAudioCache: (cfiRange, audioPath) => {
         const newCache = new Map(get().audioCache)

@@ -20,22 +20,28 @@ export class Player {
   private nextPageParagraphs: ParagraphWithCFI[]
   private previousPageParagraphs: ParagraphWithCFI[]
   constructor(rendition: Rendition, bookId: string) {
+    console.log({ rendition })
     this.rendition = rendition
     this.playingState = PlayingState.Stopped
     this.currentParagraphIndex = 0
     this.bookId = bookId
-    this.paragraphs = []
+    // this.paragraphs = rendition.getCurrentViewParagraphs() || []
+    rendition.on('rendered', () => {
+      this.paragraphs = rendition.getCurrentViewParagraphs() || []
+      console.log({ paragraphs: this.paragraphs })
+      this.audioElement = new Audio()
+      this.audioElement.addEventListener('ended', this.handleEnded)
+      this.audioElement.addEventListener('error', this.handleError)
+    })
     this.audioCache = new Map()
     this.priority = 3
     this.errors = []
-    this.audioElement = new Audio()
+
     this.direction = 'forward'
     this.nextPageParagraphs = []
     this.previousPageParagraphs = []
-    this.audioElement.addEventListener('ended', this.handleEnded)
-    this.audioElement.addEventListener('error', this.handleError)
   }
-  private cleanup() {
+  public cleanup() {
     this.audioElement.removeEventListener('ended', this.handleEnded)
     this.audioElement.removeEventListener('error', this.handleError)
     this.audioElement.pause()
@@ -94,44 +100,85 @@ export class Player {
   }
 
   public async play() {
-    if (this.playingState === PlayingState.Playing) return
+    console.debug('🎵 Player.play() called')
+    console.debug('🎵 Current playing state:', this.playingState)
+
+    if (this.playingState === PlayingState.Playing) {
+      console.debug('🎵 Already playing, returning early')
+      return
+    }
 
     this.playingState = PlayingState.Playing
+    console.debug('🎵 Set playing state to:', this.playingState)
+
     if (!this.hasApiKey()) {
+      console.error('🎵 No API key available')
       this.errors.push('OpenAI API key not configured')
       return
     }
+    console.log('🎵 Has API Key:', this.hasApiKey())
+
     if (this.paragraphs.length === 0) {
-      this.errors.push('No paragraphs available to play')
-    }
-    if (this.currentParagraphIndex >= this.paragraphs.length || this.currentParagraphIndex < 0) {
+      console.error('🎵 No paragraphs available')
       this.errors.push('No paragraphs available to play')
       return
     }
+    console.debug('🎵 Total paragraphs available:', this.paragraphs.length)
+
+    if (this.currentParagraphIndex >= this.paragraphs.length || this.currentParagraphIndex < 0) {
+      console.error(
+        '🎵 Invalid paragraph index:',
+        this.currentParagraphIndex,
+        'out of',
+        this.paragraphs.length
+      )
+      this.errors.push('No paragraphs available to play')
+      return
+    }
+    console.debug('🎵 Current paragraph index:', this.currentParagraphIndex)
 
     const currentParagraph = this.paragraphs[this.currentParagraphIndex]
+    console.debug('🎵 Current paragraph:', {
+      cfiRange: currentParagraph.cfiRange,
+      textLength: currentParagraph.text.length,
+      textPreview: currentParagraph.text.substring(0, 100) + '...'
+    })
+
     // Highlight current paragraph and store reference
+    console.debug('🎵 Highlighting paragraph with CFI:', currentParagraph.cfiRange)
     this.highlightParagraph(currentParagraph)
+
     // Request audio with high priority
+    console.debug('🎵 Requesting audio for paragraph...')
     const audioPath = await this.requestAudio(currentParagraph, this.getNextPriority())
+    console.debug('🎵 Audio path received:', audioPath)
+
     if (!audioPath) {
+      console.error('🎵 Failed to get audio path')
       this.errors.push('Failed to request audio')
       return
     }
+
+    console.debug('🎵 Setting up audio element...')
     this.audioElement.pause()
     this.audioElement.currentTime = 0
 
     // Set new source and wait for it to be ready
     this.audioElement.src = audioPath
     this.audioElement.load()
+    console.debug('🎵 Audio element loaded with src:', audioPath)
+
     try {
+      console.debug('🎵 Waiting for audio to be ready...')
       await new Promise((resolve, reject) => {
         const handleCanPlay = () => {
+          console.debug('🎵 Audio can play through - ready to play')
           this.audioElement?.removeEventListener('canplaythrough', handleCanPlay)
           this.audioElement?.removeEventListener('error', handleError)
           resolve(undefined)
         }
         const handleError = (e: Event) => {
+          console.error('🎵 Audio load error:', e)
           this.audioElement?.removeEventListener('canplaythrough', handleCanPlay)
           this.audioElement?.removeEventListener('error', handleError)
           reject(e)
@@ -139,13 +186,17 @@ export class Player {
         this.audioElement?.addEventListener('canplaythrough', handleCanPlay, { once: true })
         this.audioElement?.addEventListener('error', handleError, { once: true })
       })
+
+      console.debug('🎵 Starting audio playback...')
       await this.audioElement.play()
       this.playingState = PlayingState.Playing
+      console.debug('🎵 Audio playback started successfully')
 
       // Prefetch next paragraphs
+      console.debug('🎵 Starting prefetch for next paragraphs...')
       this.prefetchAudio(this.currentParagraphIndex + 1, 3)
     } catch (error) {
-      console.error('Playback failed:', error)
+      console.error('🎵 Playback failed:', error)
       this.errors.push(
         `Playback failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       )
@@ -210,43 +261,45 @@ export class Player {
     this.previousPageParagraphs = (await this.rendition.getPreviousViewParagraphs()) || []
     this.nextPageParagraphs = temp
   }
-
-  public next = async () => {
-    const nextIndex = this.currentParagraphIndex + 1
-
-    this.direction = 'forward'
-
-    if (nextIndex == this.paragraphs.length - 1) {
+  private updateParagaph = async (index: number) => {
+    // bounds checks
+    if (index < 0) {
+      this.moveToPreviousPage()
+      return
+    }
+    if (index >= this.paragraphs.length) {
+      this.moveToNextPage()
+      return
+    }
+    if (index == this.paragraphs.length - 1) {
       // Request audio for the next paragraphs of the next page
       if (this.playingState === PlayingState.Playing) {
         this.prefetchNextPageAudio(3)
       }
     }
-
-    // If at end of current page, go to next page
-    if (nextIndex >= this.paragraphs.length) {
-      this.moveToNextPage()
-
-      if (this.playingState !== PlayingState.Playing) {
-        return
+    if (index == 0) {
+      // Request audio for the previous paragraphs of the previous page
+      if (this.playingState === PlayingState.Playing) {
+        this.prefetchAudio(index - 1, 3)
       }
     }
-    const currentParagraph = this.getCurrentParagraph()
-    if (!currentParagraph) return
-    this.unhighlightParagraph(currentParagraph)
-    const nextParagraph = this.getNextParagraph()
-    if (!nextParagraph) return
-    this.highlightParagraph(nextParagraph)
-    this.currentParagraphIndex = nextIndex
+    // first remove the current paragraph highlight and pause audio
+    let currentParagraph = this.getCurrentParagraph()
+    if (currentParagraph) {
+      this.unhighlightParagraph(currentParagraph)
+    }
 
-    // Always handle audio and highlighting when next is clicked
-    // Pause current audio first
+    this.currentParagraphIndex = index
+    currentParagraph = this.getCurrentParagraph()
+    if (!currentParagraph) return
+
+    this.highlightParagraph(currentParagraph)
+
     this.audioElement.pause()
 
-    // If was playing, continue playing with next paragraph
     if (this.playingState !== PlayingState.Playing) return
     try {
-      const audioPath = await this.requestAudio(nextParagraph, this.getNextPriority())
+      const audioPath = await this.requestAudio(currentParagraph, this.getNextPriority())
 
       if (!audioPath) return
       this.audioElement.pause()
@@ -270,7 +323,8 @@ export class Player {
       })
 
       await this.audioElement.play()
-      this.prefetchAudio(nextIndex + 1, 3)
+      this.prefetchAudio(index + 1, 3)
+      this.prefetchAudio(index - 3, 3)
     } catch (error) {
       console.error('Failed to play next paragraph:', error)
       this.errors.push(
@@ -282,81 +336,22 @@ export class Player {
   public prev = async () => {
     this.direction = 'backward'
     const prevIndex = this.currentParagraphIndex - 1
+    this.updateParagaph(prevIndex)
+  }
+  public next = async () => {
+    const nextIndex = this.currentParagraphIndex + 1
 
-    // If at start of current page, go to previous page
-    if (prevIndex < 0) {
-      // TODO: Need to set new paragraphs for both the previous and next pages
+    this.direction = 'forward'
 
-      // Will be set to last paragraph when new page loads
-      // Navigate to previous page
+    this.updateParagaph(nextIndex)
+  }
 
-      this.moveToPreviousPage()
+  public getPlayingState() {
+    return this.playingState
+  }
 
-      return
-    }
-
-    // Remove current highlight using stored reference
-    const currentParagraph = this.getCurrentParagraph()
-    if (currentParagraph) {
-      try {
-        this.unhighlightParagraph(currentParagraph)
-      } catch (error) {
-        console.warn('Failed to remove highlight:', error)
-      }
-    }
-
-    this.currentParagraphIndex = prevIndex
-    const prevParagraph = this.getPreviousParagraph()
-    if (!prevParagraph) return
-
-    // Always handle audio and highlighting when prev is clicked
-    // Pause current audio first
-    if (this.audioElement) {
-      this.audioElement.pause()
-    }
-
-    // Highlight previous paragraph
-
-    this.highlightParagraph(prevParagraph)
-
-    // If was playing, continue playing with previous paragraph
-    if (this.playingState !== PlayingState.Playing) return
-
-    try {
-      const audioPath = await this.requestAudio(prevParagraph, this.getNextPriority())
-
-      if (audioPath) {
-        this.audioElement.pause()
-        this.audioElement.currentTime = 0
-        this.audioElement.src = audioPath
-        this.audioElement.load()
-
-        await new Promise((resolve, reject) => {
-          const handleCanPlay = () => {
-            this.audioElement.removeEventListener('canplaythrough', handleCanPlay)
-            this.audioElement.removeEventListener('error', handleError)
-            resolve(undefined)
-          }
-          const handleError = (e: Event) => {
-            this.audioElement.removeEventListener('canplaythrough', handleCanPlay)
-            this.audioElement.removeEventListener('error', handleError)
-            reject(e)
-          }
-          this.audioElement.addEventListener('canplaythrough', handleCanPlay, { once: true })
-          this.audioElement.addEventListener('error', handleError, { once: true })
-        })
-
-        await this.audioElement.play()
-        // Prefetch backwards for previous paragraphs
-        this.prefetchAudio(prevIndex - 3, 3)
-      }
-    } catch (error) {
-      console.error('Failed to play previous paragraph:', error)
-      this.errors.push(
-        `Failed to play previous paragraph: ${error instanceof Error ? error.message : 'Unknown error'}`
-      )
-      this.playingState = PlayingState.Stopped
-    }
+  public getErrors() {
+    return this.errors
   }
 
   private getNextPriority() {
