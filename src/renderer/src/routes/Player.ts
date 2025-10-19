@@ -290,7 +290,6 @@ export class Player {
       // Will be set to last paragraph when new page loads
       // Navigate to previous page
 
-      
       this.moveToPreviousPage()
 
       return
