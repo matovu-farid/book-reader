@@ -20,6 +20,13 @@ export default defineConfig({
         epubjs: resolve('src/renderer/src/epubjs/src')
       }
     },
-    plugins: [react(), TanStackRouterVite()]
+    plugins: [
+      react({
+        babel: {
+          plugins: [['babel-plugin-react-compiler']]
+        }
+      }),
+      TanStackRouterVite()
+    ]
   }
 })

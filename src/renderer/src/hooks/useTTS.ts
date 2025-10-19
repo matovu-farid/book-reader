@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef } from 'react'
-import type { Rendition } from '@epubjs'
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
+import type { Rendition } from '@renderer/epubjs/types'
 import type { ParagraphWithCFI } from '../../../shared/types'
 import { PlayingState, useTTSStore } from '../stores/ttsStore'
 import { useTTSApiKeyStatus, useTTSQueueStatus, useRequestTTSAudio } from './useTTSQueries'
@@ -24,7 +24,7 @@ export interface TTSControls {
 interface UseTTSProps {
   bookId: string
   rendition: Rendition | null
-  onNavigateToPreviousPage: () => void
+  onNavigateToPreviousPage: (playingState: PlayingState) => void | Promise<void>
   onNavigateToNextPage: () => void
   nextPageParagraphs?: ParagraphWithCFI[]
 }
@@ -38,6 +38,7 @@ export function useTTS({
 }: UseTTSProps): TTSControls {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const currentHighlightRef = useRef<string | null>(null)
+  const [ttsPriority, setTTSPriority] = useState<number>(3)
 
   // Zustand store
   const {
@@ -54,7 +55,10 @@ export function useTTS({
     setCurrentBookId,
     setCurrentPage,
     addToAudioCache,
-    setError
+    setError,
+    setToLastParagraphIndex,
+    direction,
+    setDirection
   } = useTTSStore()
 
   // React Query hooks
@@ -77,7 +81,27 @@ export function useTTS({
   }, [bookId, setCurrentBookId])
 
   // Create ref for advanceToNextParagraph to avoid stale closure
-  const advanceToNextParagraphRef = useRef<() => void>()
+  // const advanceToNextParagraphRef = useRef<() => void>(() => {})
+  const handleEnded = useEffectEvent(() => {
+    // Safely remove current highlight
+    if (currentHighlightRef.current && rendition) {
+      try {
+        rendition.removeHighlight(currentHighlightRef.current)
+        currentHighlightRef.current = null
+      } catch (error) {
+        console.warn('Failed to remove highlight:', error)
+      }
+    }
+
+    // advanceToNextParagraphRef.current?.() // Use ref to avoid stale closure
+    next()
+  })
+  const handleError = useEffectEvent((e: Event) => {
+    console.error('Audio error:', e)
+    setError('Audio playback failed')
+
+    setPlayingState(PlayingState.Stopped)
+  })
 
   // Audio element management with proper cleanup
   useEffect(() => {
@@ -88,28 +112,6 @@ export function useTTS({
 
     const audio = audioRef.current
 
-    // Event handlers as stable functions
-    const handleEnded = () => {
-      // Safely remove current highlight
-      if (currentHighlightRef.current && rendition) {
-        try {
-          rendition.removeHighlight(currentHighlightRef.current)
-          currentHighlightRef.current = null
-        } catch (error) {
-          console.warn('Failed to remove highlight:', error)
-        }
-      }
-
-      advanceToNextParagraphRef.current?.() // Use ref to avoid stale closure
-    }
-
-    const handleError = (e: Event) => {
-      console.error('Audio error:', e)
-      setError('Audio playback failed')
-
-      setPlayingState(PlayingState.Stopped)
-    }
-
     audio.addEventListener('ended', handleEnded)
     audio.addEventListener('error', handleError)
 
@@ -119,28 +121,33 @@ export function useTTS({
       audio.pause()
       audio.src = ''
     }
-  }, [setPlayingState, setError]) // Include dependencies
+  }, [])
 
+  const currentLocation = rendition?.location?.start?.cfi
+  const { currentPage } = useTTSStore()
+  const trackChangesToAudioContinuation = useEffectEvent((currentLocation: string) => {
+    if (currentLocation === currentPage) return
+    // Page changed
+    if (playingState === PlayingState.Playing) {
+      // Audio is playing - check if we need to continue
+
+      if (direction === 'forward') {
+        // User manually navigated forward while audio playing
+        // Reset to first paragraph of new page
+        setCurrentParagraphIndex(0)
+      } else {
+        setToLastParagraphIndex()
+      }
+    }
+
+    setCurrentPage(currentLocation)
+  })
   // Track page changes to handle audio continuation
   useEffect(() => {
-    const currentLocation = rendition?.location?.start?.cfi
-
-    if (currentLocation && currentLocation !== useTTSStore.getState().currentPage) {
-      // Page changed
-      if (playingState === PlayingState.Playing) {
-        // Audio is playing - check if we need to continue
-        const isMovingForward = true // For now, assume forward navigation
-
-        if (isMovingForward) {
-          // User manually navigated forward while audio playing
-          // Reset to first paragraph of new page
-          setCurrentParagraphIndex(0)
-        }
-      }
-
-      setCurrentPage(currentLocation)
+    if (currentLocation) {
+      trackChangesToAudioContinuation(currentLocation)
     }
-  }, [rendition?.location?.start?.cfi, playingState, setCurrentPage, setCurrentParagraphIndex])
+  }, [currentLocation])
 
   // Set up audio ready listener
   useEffect(() => {
@@ -218,7 +225,7 @@ export function useTTS({
         const index = startIndex + i
         if (index < paragraphs.length && index >= 0) {
           const paragraph = paragraphs[index]
-          requestAudio(paragraph, 1).catch((error) => {
+          requestAudio(paragraph, ttsPriority - 1).catch((error) => {
             console.warn(`Prefetch failed for paragraph ${index}:`, error)
           }) // Fix: Add error logging for prefetch failures
         }
@@ -232,7 +239,7 @@ export function useTTS({
       if (nextPageParagraphs.length === 0) return
       for (let i = 0; i < Math.min(count, nextPageParagraphs.length); i++) {
         const paragraph = nextPageParagraphs[i]
-        requestAudio(paragraph, 1).catch((error) => {
+        requestAudio(paragraph, ttsPriority - 1).catch((error) => {
           console.warn(`Prefetch failed for next page paragraph ${i}:`, error)
         })
       }
@@ -240,100 +247,104 @@ export function useTTS({
     [nextPageParagraphs, requestAudio]
   )
 
-  const advanceToNextParagraph = useCallback(async () => {
-    const nextIndex = currentParagraphIndex + 1
-    if (nextIndex == paragraphs.length - 1) {
-      // Request audio for the next paragraphs of the next page
-      prefetchNextPageAudio(3)
-    }
+  // const advanceToNextParagraph = useCallback(async () => {
+  //   const nextIndex = currentParagraphIndex + 1
+  //   if (nextIndex == paragraphs.length - 1) {
+  //     // Request audio for the next paragraphs of the next page
+  //     prefetchNextPageAudio(3)
+  //   }
 
-    // Check if we're at end of current page
-    if (nextIndex >= paragraphs.length) {
-      // Navigate to next page
-      onNavigateToNextPage()
+  //   // Check if we're at end of current page
+  //   if (nextIndex >= paragraphs.length) {
+  //     // Navigate to next page
+  //     onNavigateToNextPage()
 
-      // Wait for new paragraphs to load (handled by page change effect)
-      // Audio will auto-start with first paragraph of next page
-      // return
-      if (playingState !== PlayingState.Playing) {
-        return
-      }
-    }
+  //     // Wait for new paragraphs to load (handled by page change effect)
+  //     // Audio will auto-start with first paragraph of next page
+  //     // return
+  //     if (playingState !== PlayingState.Playing) {
+  //       return
+  //     }
+  //   }
 
-    // Remove current highlight BEFORE updating index
-    if (currentHighlightRef.current && rendition) {
-      try {
-        rendition.removeHighlight(currentHighlightRef.current)
-      } catch (error) {
-        console.warn('Failed to remove highlight:', error)
-      }
-    }
+  //   // Remove current highlight BEFORE updating index
+  //   if (currentHighlightRef.current && rendition) {
+  //     try {
+  //       rendition.removeHighlight(currentHighlightRef.current)
+  //     } catch (error) {
+  //       console.warn('Failed to remove highlight:', error)
+  //     }
+  //   }
 
-    // Move to next paragraph on same page
-    setCurrentParagraphIndex(nextIndex)
+  //   // Move to next paragraph on same page
+  //   setCurrentParagraphIndex(nextIndex)
 
-    const nextParagraph = paragraphs[nextIndex]
-    if (!nextParagraph) return
+  //   const nextParagraph = paragraphs[nextIndex]
+  //   if (!nextParagraph) return
 
-    // Highlight next paragraph and store reference
-    if (rendition) {
-      currentHighlightRef.current = nextParagraph.cfiRange
-      rendition.highlightRange(nextParagraph.cfiRange)
-    }
+  //   // Highlight next paragraph and store reference
+  //   if (rendition) {
+  //     currentHighlightRef.current = nextParagraph.cfiRange
+  //     rendition.highlightRange(nextParagraph.cfiRange)
+  //   }
 
-    // Request and play audio with proper handling
-    try {
-      const audioPath = await requestAudio(nextParagraph, 2)
-      if (audioPath && audioRef.current) {
-        // Pause current audio before setting new source
-        audioRef.current.pause()
-        audioRef.current.currentTime = 0
+  //   // Request and play audio with proper handling
+  //   try {
+  //     const audioPath = await requestAudio(nextParagraph, ttsPriority)
+  //     setTTSPriority((ttsPriority) => ttsPriority + 1)
+  //     if (audioPath && audioRef.current) {
+  //       // Pause current audio before setting new source
+  //       audioRef.current.pause()
+  //       audioRef.current.currentTime = 0
 
-        // Set new source and wait for it to be ready
-        audioRef.current.src = audioPath
-        audioRef.current.load()
+  //       // Set new source and wait for it to be ready
+  //       audioRef.current.src = audioPath
+  //       audioRef.current.load()
 
-        // Wait for audio to be ready before playing
-        await new Promise((resolve, reject) => {
-          const handleCanPlay = () => {
-            audioRef.current?.removeEventListener('canplaythrough', handleCanPlay)
-            audioRef.current?.removeEventListener('error', handleError)
-            resolve(undefined)
-          }
-          const handleError = (e: Event) => {
-            audioRef.current?.removeEventListener('canplaythrough', handleCanPlay)
-            audioRef.current?.removeEventListener('error', handleError)
-            reject(e)
-          }
-          audioRef.current?.addEventListener('canplaythrough', handleCanPlay, { once: true })
-          audioRef.current?.addEventListener('error', handleError, { once: true })
-        })
+  //       // Wait for audio to be ready before playing
+  //       await new Promise((resolve, reject) => {
+  //         const handleCanPlay = () => {
+  //           audioRef.current?.removeEventListener('canplaythrough', handleCanPlay)
+  //           audioRef.current?.removeEventListener('error', handleError)
+  //           resolve(undefined)
+  //         }
+  //         const handleError = (e: Event) => {
+  //           audioRef.current?.removeEventListener('canplaythrough', handleCanPlay)
+  //           audioRef.current?.removeEventListener('error', handleError)
+  //           reject(e)
+  //         }
+  //         audioRef.current?.addEventListener('canplaythrough', handleCanPlay, { once: true })
+  //         audioRef.current?.addEventListener('error', handleError, { once: true })
+  //       })
 
-        await audioRef.current.play()
-        setPlayingState(PlayingState.Playing) // Fix: Set loading to false when audio starts playing
-      }
+  //       await audioRef.current.play()
+  //       setPlayingState(PlayingState.Playing) // Fix: Set loading to false when audio starts playing
+  //     }
 
-      // Prefetch next paragraphs
-      prefetchAudio(nextIndex + 1, 3)
-    } catch (error) {
-      console.error('Failed to advance:', error)
-      setPlayingState(PlayingState.Stopped)
-    }
-  }, [
-    currentParagraphIndex,
-    paragraphs,
-    rendition,
-    requestAudio,
-    prefetchAudio,
-    prefetchNextPageAudio,
-    onNavigateToNextPage,
-    setCurrentParagraphIndex
-  ])
+  //     // Prefetch next paragraphs
+  //     prefetchAudio(nextIndex + 1, 3)
+  //   } catch (error) {
+  //     console.error('Failed to advance:', error)
+  //     setPlayingState(PlayingState.Stopped)
+  //   }
+  // }, [
+  //   currentParagraphIndex,
+  //   paragraphs,
+  //   rendition,
+  //   setCurrentParagraphIndex,
+  //   prefetchNextPageAudio,
+  //   onNavigateToNextPage,
+  //   playingState,
+  //   requestAudio,
+  //   ttsPriority,
+  //   prefetchAudio,
+  //   setPlayingState
+  // ])
 
   // Update ref when function changes
-  useEffect(() => {
-    advanceToNextParagraphRef.current = advanceToNextParagraph
-  }, [advanceToNextParagraph])
+  // useEffect(() => {
+  //   advanceToNextParagraphRef.current = advanceToNextParagraph
+  // }, [advanceToNextParagraph])
 
   const play = useCallback(async () => {
     if (!hasApiKey) {
@@ -448,10 +459,13 @@ export function useTTS({
 
   const next = useCallback(async () => {
     const nextIndex = currentParagraphIndex + 1
+    setDirection('forward')
 
     if (nextIndex == paragraphs.length - 1) {
       // Request audio for the next paragraphs of the next page
-      prefetchNextPageAudio(3)
+      if (playingState === PlayingState.Playing) {
+        prefetchNextPageAudio(3)
+      }
     }
 
     // If at end of current page, go to next page
@@ -493,7 +507,8 @@ export function useTTS({
     // If was playing, continue playing with next paragraph
     if (playingState === PlayingState.Playing) {
       try {
-        const audioPath = await requestAudio(nextParagraph, 2)
+        const audioPath = await requestAudio(nextParagraph, ttsPriority)
+        setTTSPriority((ttsPriority) => ttsPriority + 1)
         if (audioPath && audioRef.current) {
           audioRef.current.pause()
           audioRef.current.currentTime = 0
@@ -528,23 +543,26 @@ export function useTTS({
     }
   }, [
     currentParagraphIndex,
+    setDirection,
     paragraphs,
-    playingState,
     rendition,
+    setCurrentParagraphIndex,
+    playingState,
+    prefetchNextPageAudio,
     onNavigateToNextPage,
     requestAudio,
     prefetchAudio,
-    setCurrentParagraphIndex,
-    setPlayingState,
-    setError
+    setError,
+    setPlayingState
   ])
 
   const prev = useCallback(async () => {
+    setDirection('backward')
     const prevIndex = currentParagraphIndex - 1
 
     // If at start of current page, go to previous page
     if (prevIndex < 0) {
-      onNavigateToPreviousPage()
+      onNavigateToPreviousPage(playingState)
       // Will be set to last paragraph when new page loads
       return
     }
@@ -577,51 +595,52 @@ export function useTTS({
     }
 
     // If was playing, continue playing with previous paragraph
-    if (playingState === PlayingState.Playing) {
-      try {
-        const audioPath = await requestAudio(prevParagraph, 2)
-        if (audioPath && audioRef.current) {
-          audioRef.current.pause()
-          audioRef.current.currentTime = 0
-          audioRef.current.src = audioPath
-          audioRef.current.load()
+    if (playingState !== PlayingState.Playing) return
 
-          await new Promise((resolve, reject) => {
-            const handleCanPlay = () => {
-              audioRef.current?.removeEventListener('canplaythrough', handleCanPlay)
-              audioRef.current?.removeEventListener('error', handleError)
-              resolve(undefined)
-            }
-            const handleError = (e: Event) => {
-              audioRef.current?.removeEventListener('canplaythrough', handleCanPlay)
-              audioRef.current?.removeEventListener('error', handleError)
-              reject(e)
-            }
-            audioRef.current?.addEventListener('canplaythrough', handleCanPlay, { once: true })
-            audioRef.current?.addEventListener('error', handleError, { once: true })
-          })
+    try {
+      const audioPath = await requestAudio(prevParagraph, ttsPriority)
+      setTTSPriority((ttsPriority) => ttsPriority + 1)
+      if (audioPath && audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current.currentTime = 0
+        audioRef.current.src = audioPath
+        audioRef.current.load()
 
-          await audioRef.current.play()
-          // Prefetch backwards for previous paragraphs
-          prefetchAudio(prevIndex - 3, 3)
-        }
-      } catch (error) {
-        console.error('Failed to play previous paragraph:', error)
-        setError(
-          `Failed to play previous paragraph: ${error instanceof Error ? error.message : 'Unknown error'}`
-        )
+        await new Promise((resolve, reject) => {
+          const handleCanPlay = () => {
+            audioRef.current?.removeEventListener('canplaythrough', handleCanPlay)
+            audioRef.current?.removeEventListener('error', handleError)
+            resolve(undefined)
+          }
+          const handleError = (e: Event) => {
+            audioRef.current?.removeEventListener('canplaythrough', handleCanPlay)
+            audioRef.current?.removeEventListener('error', handleError)
+            reject(e)
+          }
+          audioRef.current?.addEventListener('canplaythrough', handleCanPlay, { once: true })
+          audioRef.current?.addEventListener('error', handleError, { once: true })
+        })
+
+        await audioRef.current.play()
+        // Prefetch backwards for previous paragraphs
+        prefetchAudio(prevIndex - 3, 3)
       }
+    } catch (error) {
+      console.error('Failed to play previous paragraph:', error)
+      setError(
+        `Failed to play previous paragraph: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
     }
   }, [
+    setDirection,
     currentParagraphIndex,
+    rendition,
+    setCurrentParagraphIndex,
     paragraphs,
     playingState,
-    rendition,
     onNavigateToPreviousPage,
     requestAudio,
     prefetchAudio,
-    setCurrentParagraphIndex,
-    setPlayingState,
     setError
   ])
 
@@ -650,6 +669,7 @@ export function useTTS({
       // If was playing, auto-start with first paragraph of new page
       if (playingState === PlayingState.Playing && newParagraphs.length > 0) {
         const firstParagraph = newParagraphs[0]
+        const lastParagraph = newParagraphs[newParagraphs.length - 1]
 
         // Highlight first paragraph
         if (rendition) {
@@ -661,8 +681,9 @@ export function useTTS({
         if (playingState !== PlayingState.Playing) {
           setPlayingState(PlayingState.Loading)
         }
-        requestAudio(firstParagraph, 2)
+        requestAudio(direction === 'forward' ? firstParagraph : lastParagraph, ttsPriority)
           .then((audioPath) => {
+            setTTSPriority((ttsPriority) => ttsPriority + 1)
             if (audioPath && audioRef.current) {
               audioRef.current.pause()
               audioRef.current.currentTime = 0

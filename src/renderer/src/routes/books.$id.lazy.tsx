@@ -17,6 +17,7 @@ import { ThemeProvider, THEME_ID, createTheme } from '@mui/material/styles'
 import PaletteIcon from '@mui/icons-material/Palette'
 import { useTTS } from '@renderer/hooks/useTTS'
 import { TTSControls } from '@renderer/components/TTSControls'
+import { PlayingState, useTTSStore } from '@renderer/stores/ttsStore'
 
 export const Route = createLazyFileRoute('/books/$id')({
   component: () => <BookView />
@@ -32,6 +33,7 @@ function updateTheme(rendition: Rendition, theme: ThemeType) {
 function BookView(): JSX.Element {
   const { id } = Route.useParams()
   const rendition = useRef<Rendition | undefined>(undefined)
+  const [renditionState, setRenditionState] = useState<Rendition | null>(null)
   const [theme, setTheme] = useState<ThemeType>(ThemeType.White)
   const popupState = usePopupState({ variant: 'popover', popupId: 'demoMenu' })
   useEffect(() => {
@@ -89,15 +91,20 @@ function BookView(): JSX.Element {
       queryClient.invalidateQueries({ queryKey: ['pageView'] })
     }
   })
+  const { setToLastParagraphIndex } = useTTSStore()
 
-  // TTS hook
+  // TTS hook - use state variable instead of ref
   const tts = useTTS({
     bookId: book?.id || '',
-    rendition: rendition.current || null,
-    onNavigateToPreviousPage: () => {
+    rendition: renditionState,
+    onNavigateToPreviousPage: (playingState: PlayingState) => {
       // Navigate to previous page
       if (rendition.current) {
-        rendition.current.prev()
+        rendition.current.prev().then(() => {
+          if (playingState === PlayingState.Playing) {
+            setToLastParagraphIndex()
+          }
+        })
       }
     },
     onNavigateToNextPage: () => {
@@ -107,6 +114,13 @@ function BookView(): JSX.Element {
       }
     }
   })
+
+  // Update rendition state when ref becomes available
+  useEffect(() => {
+    if (rendition.current && !renditionState) {
+      setRenditionState(rendition.current)
+    }
+  }, [renditionState])
 
   // Handle paragraph extraction for TTS
   const handlePageParagraphsExtracted = (data: { paragraphs: ParagraphWithCFI[] }) => {
@@ -191,6 +205,7 @@ function BookView(): JSX.Element {
             getRendition={(_rendition) => {
               updateTheme(_rendition, theme)
               rendition.current = _rendition
+              setRenditionState(_rendition)
             }}
           />
         </div>

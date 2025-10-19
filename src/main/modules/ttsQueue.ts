@@ -34,12 +34,26 @@ export class TTSQueue extends EventEmitter {
   private readonly MAX_RETRIES = 3
   private readonly RETRY_DELAY_MS = 1000
   private readonly REQUEST_TIMEOUT_MS = 30000
+  private readonly MAX_QUEUE_SIZE = 15
 
   constructor() {
     super()
-    // Initialize priority queue with custom comparator (higher priority first)
+
+    // Priority queue comparator: higher priority first
+    /**
+     * Initialize priority queue with custom comparator (higher priority first)
+     */
     this.queue = new PriorityQueue((a: QueueItem, b: QueueItem) => b.priority - a.priority)
     this.initializeOpenAI()
+    this.on('request-audio', this.maintainQueueSize)
+  }
+
+  private maintainQueueSize(): void {
+    setInterval(() => {
+      while (this.queue.size() >= this.MAX_QUEUE_SIZE) {
+        this.queue.deq()
+      }
+    }, 10)
   }
 
   /**
@@ -69,11 +83,12 @@ export class TTSQueue extends EventEmitter {
     bookId: string,
     cfiRange: string,
     text: string,
-    priority = 0
+    priority = 0 // 0 is normal priority, 1 is high priority, 2 is highest priority
   ): Promise<string> {
     if (!this.hasApiKey()) {
       throw new Error('OpenAI API key not configured')
     }
+    this.emit('request-audio', { bookId, cfiRange, text, priority })
 
     // Create unique request ID for deduplication
     const requestId = `${bookId}-${cfiRange}`
@@ -104,11 +119,10 @@ export class TTSQueue extends EventEmitter {
         retryCount: 0
       }
 
-      // Store in deduplication map
-      this.requestDeduplication.set(requestId, queueItem)
-
       // Add item to priority queue (automatically sorted by priority)
       this.queue.enq(queueItem)
+      // Store in deduplication map
+      this.requestDeduplication.set(requestId, queueItem)
 
       // Start processing if not already running
       if (!this.isProcessing) {

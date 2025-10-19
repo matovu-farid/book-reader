@@ -52,12 +52,13 @@ export class TTSService extends EventEmitter {
   /**
    * Request audio for a paragraph
    * Checks cache first, then queues for generation if not cached
+   *
    */
   async requestAudio(
     bookId: string,
     cfiRange: string,
     text: string,
-    priority = 0
+    priority = 0 // 0 is normal priority, 1 is high priority, 2 is highest priority
   ): Promise<string> {
     const requestId = `${bookId}-${cfiRange}`
 
