@@ -21,26 +21,6 @@ interface TTSControlsProps {
 }
 
 export function TTSControls({ bookId, rendition, disabled = false }: TTSControlsProps) {
-  // const tts = useTTS({
-  //   bookId: book?.id || '',
-  //   rendition: renditionState,
-  //   onNavigateToPreviousPage: (playingState: PlayingState) => {
-  //     // Navigate to previous page
-  //     if (rendition.current) {
-  //       rendition.current.prev().then(() => {
-  //         if (playingState === PlayingState.Playing) {
-  //           setToLastParagraphIndex()
-  //         }
-  //       })
-  //     }
-  //   },
-  //   onNavigateToNextPage: () => {
-  //     // Navigate to next page
-  //     if (rendition.current) {
-  //       rendition.current.next()
-  //     }
-  //   }
-  // })
   const [showError, setShowError] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
 
