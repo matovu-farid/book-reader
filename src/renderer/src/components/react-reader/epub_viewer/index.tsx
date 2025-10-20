@@ -9,8 +9,8 @@ import type {
   RenditionOptions,
   BookOptions,
   Book
-} from 'epubjs'
-import Epub from 'epubjs'
+} from '@renderer/epubjs/src/index'
+import Epub from '@renderer/epubjs/src'
 import { EpubViewStyle as defaultStyles, type IEpubViewStyle } from './style'
 import type { ParagraphWithCFI } from 'src/shared/types'
 
@@ -104,7 +104,7 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
    * - Triggers reader initialization once book is loaded
    */
   initBook() {
-    const { url, tocChanged, epubInitOptions } = this.props
+    const { url, tocChanged, epubInitOptions = {} } = this.props
     // Destroy existing book instance if it exists (e.g., when switching books)
     if (this.book) {
       this.book.destroy()
@@ -208,6 +208,7 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
         }
         this.nextPage = () => {
           rendition.next()
+          rendition.emit('nextPage')
         }
 
         // Set up event listeners for user interactions
@@ -222,7 +223,7 @@ export class EpubView extends Component<IEpubViewProps, IEpubViewState> {
         } else if (toc.length > 0 && toc[0].href) {
           rendition.display(toc[0].href)
         } else {
-          rendition.display()
+          rendition.display('')
         }
       }
     }
