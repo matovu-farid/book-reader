@@ -48,7 +48,7 @@ export interface Location {
   atEnd: boolean
 }
 
-export default class Rendition {
+export default class Renditions {
   constructor(book: Book, options: RenditionOptions)
 
   settings: RenditionOptions
