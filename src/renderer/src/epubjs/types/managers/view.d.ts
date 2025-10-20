@@ -1,80 +1,92 @@
-import Section from "../section";
-import Contents from "../contents";
-import Layout from "../layout";
+import Section from '../section'
+import Contents from '../contents'
+import Layout from '../layout'
 
 export interface ViewSettings {
-  ignoreClass?: string,
-  axis?: string,
-  flow?: string,
-  layout?: Layout,
-  method?: string,
-  width?: number,
-  height?: number,
-  forceEvenPages?: boolean,
+  ignoreClass?: string
+  axis?: string
+  flow?: string
+  layout?: Layout
+  method?: string
+  width?: number
+  height?: number
+  forceEvenPages?: boolean
   allowScriptedContent?: boolean
 }
 
 export default class View {
-  constructor(section: Section, options: ViewSettings);
+  constructor(section: Section, options: ViewSettings)
 
-  create(): any;
+  create(): any
 
-  render(request?: Function, show?: boolean): Promise<void>;
+  render(request?: Function, show?: boolean): Promise<void>
 
-  reset(): void;
+  reset(): void
 
-  size(_width: Number, _height: Number): void;
+  size(_width: Number, _height: Number): void
 
-  load(content: Contents): Promise<any>;
+  load(content: Contents): Promise<any>
 
-  setLayout(layout: Layout): void;
+  setLayout(layout: Layout): void
 
-  setAxis(axis: string): void;
+  setAxis(axis: string): void
 
-  display(request?: Function): Promise<any>;
+  display(request?: Function): Promise<any>
 
-  show(): void;
+  show(): void
 
-  hide(): void;
+  hide(): void
 
-  offset(): { top: Number, left: Number };
+  offset(): { top: Number; left: Number }
 
-  width(): Number;
+  width(): Number
 
-  height(): Number;
+  height(): Number
 
-  position(): object;
+  position(): object
 
-  locationOf(target: string): { top: Number, left: Number };
+  locationOf(target: string): { top: Number; left: Number }
 
-  onDisplayed(view: View): void;
+  onDisplayed(view: View): void
 
-  onResize(view: View): void;
+  onResize(view: View): void
 
-  bounds(force?: boolean): object;
+  bounds(force?: boolean): object
 
-  highlight(cfiRange: string, data?: object, cb?: Function, className?: string, styles?: object): void;
+  highlight(
+    cfiRange: string,
+    data?: object,
+    cb?: Function,
+    className?: string,
+    styles?: object
+  ): void
 
-	underline(cfiRange: string, data?: object, cb?: Function, className?: string, styles?: object): void;
+  underline(
+    cfiRange: string,
+    data?: object,
+    cb?: Function,
+    className?: string,
+    styles?: object
+  ): void
 
-	mark(cfiRange: string, data?: object, cb?: Function): void;
+  mark(cfiRange: string, data?: object, cb?: Function): void
 
-  unhighlight(cfiRange: string): void;
+  unhighlight(cfiRange: string): void
 
-  ununderline(cfiRange: string): void;
+  ununderline(cfiRange: string): void
 
-  unmark(cfiRange: string): void;
+  unmark(cfiRange: string): void
 
-  destroy(): void;
+  destroy(): void
 
-  private onLoad(event: Event, promise: Promise<any>): void;
+  private onLoad(event: Event, promise: Promise<any>): void
 
   // Event emitters
-  emit(type: any, ...args: any[]): void;
+  emit(type: any, ...args: any[]): void
 
-  off(type: any, listener: any): any;
+  off(type: any, listener: any): any
 
-  on(type: any, listener: any): any;
+  on(type: any, listener: any): any
 
-  once(type: any, listener: any, ...args: any[]): any;
+  once(type: any, listener: any, ...args: any[]): any
 }

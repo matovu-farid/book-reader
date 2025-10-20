@@ -1,4 +1,7 @@
-import EventEmitter from 'event-emitter'
+/* eslint-disable @typescript-eslint/ban-types */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+import EventEmitter from 'events'
 import { extend, defer, isFloat } from './utils/core'
 import Hook from './utils/hook'
 import EpubCFI from './epubcfi'
@@ -17,52 +20,110 @@ import IframeView from './managers/views/iframe'
 import DefaultViewManager from './managers/default/index'
 import ContinuousViewManager from './managers/continuous/index'
 
-/**
- * @typedef {import('../types/book').default} Book
- */
-/**
- * @typedef {Object} View
- * @property {number} index
- * @property {Section} section
- * @property {Contents} contents
- */
-/**
- * @typedef {Object} Section
- * @property {number} index
- * @property {number[]} pages
- * @property {number} totalPages
- * @property {EpubCFIPair} mapping
- */
-/**
- * @typedef {Object} EpubCFIPair
- * @property {string} start
- * @property {string} end
- */
-/**
- * Displays an Epub as a series of Views for each Section.
- * Requires Manager and View class to handle specifics of rendering
- * the section content.
- * @class
- * @param {Book} book
- * @param {object} [options]
- * @param {number} [options.width]
- * @param {number} [options.height]
- * @param {string} [options.ignoreClass] class for the cfi parser to ignore
- * @param {string | function | object} [options.manager='default']
- * @param {string | function} [options.view='iframe']
- * @param {string} [options.layout] layout to force
- * @param {string} [options.spread] force spread value
- * @param {number} [options.minSpreadWidth] overridden by spread: none (never) / both (always)
- * @param {string} [options.stylesheet] url of stylesheet to be injected
- * @param {boolean} [options.resizeOnOrientationChange] false to disable orientation events
- * @param {string} [options.script] url of script to be injected
- * @param {boolean | object} [options.snap=false] use snap scrolling
- * @param {string} [options.defaultDirection='ltr'] default text direction
- * @param {boolean} [options.allowScriptedContent=false] enable running scripts in content
- * @param {boolean} [options.allowPopups=false] enable opening popup in content
- */
-class Rendition {
-  constructor(book, options) {
+import Book from './book'
+import Section from './section'
+
+export type ParagraphWithCFI = {
+  text: string
+  cfiRange: string
+}
+
+export interface DisplayedLocation {
+  index: number
+  href: string
+  cfi: string
+  location: number
+  percentage: number
+  displayed: {
+    page: number
+    total: number
+  }
+}
+
+export interface Location {
+  start: DisplayedLocation
+  end: DisplayedLocation
+  atStart: boolean
+  atEnd: boolean
+}
+
+export interface View {
+  on(MARK_CLICKED: any, arg1: (cfiRange: string, data: unknown) => void): unknown
+  index: number
+  section: Section
+  contents: Contents
+}
+
+// type Section = {
+//   index: number
+//   pages: number[]
+//   totalPages: number
+//   mapping: EpubCFIPair
+// }
+
+type EpubCFIPair = {
+  start: string
+  end: string
+}
+
+export interface RenditionOptions {
+  globalLayoutProperties: {
+    layout: any
+    spread: any
+    orientation: any
+    flow: any
+    viewport: any
+    minSpreadWidth: any
+    direction: any
+  }
+  orientation: any
+  direction: any
+  width?: number | string
+  height?: number | string
+  ignoreClass?: string
+  manager?: string | Function | object
+  view?: string | Function | object
+  flow?: string
+  layout?: string
+  spread?: string | boolean
+  minSpreadWidth?: number
+  stylesheet?: string
+  resizeOnOrientationChange?: boolean
+  script?: string
+  infinite?: boolean
+  overflow?: string
+  snap?: boolean | object
+  defaultDirection?: string
+  allowScriptedContent?: boolean
+  allowPopups?: boolean
+}
+
+export class Rendition extends EventEmitter {
+  settings: RenditionOptions
+  book: Book
+  hooks: {
+    display: Hook
+    serialize: Hook
+    content: Hook
+    unloaded: Hook
+    layout: Hook
+    render: Hook
+    show: Hook
+  }
+  themes: Themes
+  annotations: Annotations
+  epubcfi: EpubCFI
+  q: Queue
+  location: Location
+  started: Promise<void>
+  private manager: DefaultViewManager | ContinuousViewManager
+  displaying: any
+  starting: any
+  ViewManager: any
+  View: any
+  _layout: any
+  constructor(book: Book, options: RenditionOptions) {
+    super()
     this.settings = extend(this.settings || {}, {
       width: null,
       height: null,
@@ -96,14 +157,22 @@ class Rendition {
      * @property {Hook} hooks.content
      * @memberof Rendition
      */
-    this.hooks = {}
-    this.hooks.display = new Hook(this)
-    this.hooks.serialize = new Hook(this)
-    this.hooks.content = new Hook(this)
-    this.hooks.unloaded = new Hook(this)
-    this.hooks.layout = new Hook(this)
-    this.hooks.render = new Hook(this)
-    this.hooks.show = new Hook(this)
+    this.hooks = {
+      display: new Hook(this),
+      serialize: new Hook(this),
+      content: new Hook(this),
+      unloaded: new Hook(this),
+      layout: new Hook(this),
+      render: new Hook(this),
+      show: new Hook(this)
+    }
+    // this.hooks.display = new Hook(this)
+    // this.hooks.serialize = new Hook(this)
+    // this.hooks.content = new Hook(this)
+    // this.hooks.unloaded = new Hook(this)
+    // this.hooks.layout = new Hook(this)
+    // this.hooks.render = new Hook(this)
+    // this.hooks.show = new Hook(this)
 
     this.hooks.content.register(this.handleLinks.bind(this))
     this.hooks.content.register(this.passEvents.bind(this))
@@ -181,7 +250,7 @@ class Rendition {
    * Set the manager function
    * @param {function} manager
    */
-  setManager(manager) {
+  setManager(manager: any) {
     this.manager = manager
   }
 
@@ -190,8 +259,8 @@ class Rendition {
    * @param  {"default" | "continuous" | object} manager [description]
    * @return {method}
    */
-  requireManager(manager) {
-    var viewManager
+  requireManager(manager: string) {
+    let viewManager: any
 
     // If manager is a string, try to load from imported managers
     if (typeof manager === 'string' && manager === 'default') {
@@ -211,8 +280,8 @@ class Rendition {
    * @param  {string|object} view
    * @return {view}
    */
-  requireView(view) {
-    var View
+  requireView(view: string) {
+    var View: any
 
     // If view is a string, try to load from imported views,
     if (typeof view == 'string' && view === 'iframe') {
@@ -299,23 +368,21 @@ class Rendition {
    * @param  {element} element to attach to
    * @return {Promise}
    */
-  attachTo(element) {
-    return this.q.enqueue(
-      function () {
-        // Start rendering
-        this.manager.render(element, {
-          width: this.settings.width,
-          height: this.settings.height
-        })
+  attachTo(element: any) {
+    return this.q.enqueue(() => {
+      // Start rendering
+      this.manager.render(element, {
+        width: this.settings.width,
+        height: this.settings.height
+      })
 
-        /**
-         * Emit that rendering has attached to an element
-         * @event attached
-         * @memberof Rendition
-         */
-        this.emit(EVENTS.RENDITION.ATTACHED)
-      }.bind(this)
-    )
+      /**
+       * Emit that rendering has attached to an element
+       * @event attached
+       * @memberof Rendition
+       */
+      this.emit(EVENTS.RENDITION.ATTACHED)
+    })
   }
 
   /**
@@ -326,7 +393,7 @@ class Rendition {
    * @param  {string} target Url or EpubCFI
    * @return {Promise}
    */
-  display(target) {
+  display(target: string): Promise<any> {
     if (this.displaying) {
       this.displaying.resolve()
     }
@@ -339,15 +406,15 @@ class Rendition {
    * @param  {string} target Url or EpubCFI
    * @return {Promise}
    */
-  _display(target) {
+  _display(target: string) {
     if (!this.book) {
       return
     }
-    var isCfiString = this.epubcfi.isCfiString(target)
-    var displaying = new defer()
-    var displayed = displaying.promise
-    var section
-    var moveTo
+    // const isCfiString = this.epubcfi.isCfiString(target)
+    const displaying = new defer()
+    const displayed = displaying.promise
+    let section: any
+    // let moveTo: any
 
     this.displaying = displaying
 
@@ -377,7 +444,7 @@ class Rendition {
         this.emit(EVENTS.RENDITION.DISPLAYED, section)
         this.reportLocation()
       },
-      (err) => {
+      (err: any) => {
         /**
          * Emit that has been an error displaying
          * @event displayError
@@ -441,8 +508,8 @@ class Rendition {
    * @private
    * @param  {*} view
    */
-  afterDisplayed(view) {
-    view.on(EVENTS.VIEWS.MARK_CLICKED, (cfiRange, data) =>
+  afterDisplayed(view: View) {
+    view.on(EVENTS.VIEWS.MARK_CLICKED, (cfiRange: string, data: unknown) =>
       this.triggerMarkEvent(cfiRange, data, view.contents)
     )
 
@@ -469,7 +536,7 @@ class Rendition {
    * @private
    * @param  {*} view
    */
-  afterRemoved(view) {
+  afterRemoved(view: View) {
     this.hooks.unloaded.trigger(view, this).then(() => {
       /**
        * Emit that a section has been removed
@@ -486,7 +553,7 @@ class Rendition {
    * Report resize events and display the last seen location
    * @private
    */
-  onResized(size, epubcfi) {
+  onResized(size: { width: any; height: any }, epubcfi: any) {
     /**
      * Emit that the rendition has been resized
      * @event resized
@@ -513,7 +580,7 @@ class Rendition {
    * Report orientation events and display the last seen location
    * @private
    */
-  onOrientationChange(orientation) {
+  onOrientationChange(orientation: any) {
     /**
      * Emit that the rendition has been rotated
      * @event orientationchange
@@ -528,7 +595,7 @@ class Rendition {
    * Usually you would be better off calling display()
    * @param {object} offset
    */
-  moveTo(offset) {
+  moveTo(offset: any) {
     this.manager.moveTo(offset)
   }
 
@@ -538,7 +605,7 @@ class Rendition {
    * @param {number} [height]
    * @param {string} [epubcfi] (optional)
    */
-  resize(width, height, epubcfi) {
+  resize(width: number, height: number, epubcfi: string) {
     if (width) {
       this.settings.width = width
     }
@@ -578,8 +645,16 @@ class Rendition {
    * @param  {object} metadata
    * @return {object} properties
    */
-  determineLayoutProperties(metadata) {
-    var properties
+  determineLayoutProperties(metadata: unknown) {
+    var properties: {
+      layout: any
+      spread: any
+      orientation: any
+      flow: any
+      viewport: any
+      minSpreadWidth: any
+      direction: any
+    }
     var layout = this.settings.layout || metadata.layout || 'reflowable'
     var spread = this.settings.spread || metadata.spread || 'auto'
     var orientation = this.settings.orientation || metadata.orientation || 'auto'
@@ -613,7 +688,7 @@ class Rendition {
    * (scrolled-continuous vs scrolled-doc are handled by different view managers)
    * @param  {string} flow
    */
-  flow(flow) {
+  flow(flow: string) {
     var _flow = flow
     if (flow === 'scrolled' || flow === 'scrolled-doc' || flow === 'scrolled-continuous') {
       _flow = 'scrolled'
@@ -647,14 +722,14 @@ class Rendition {
    * Adjust the layout of the rendition to reflowable or pre-paginated
    * @param  {object} settings
    */
-  layout(settings) {
+  layout(settings: { spread: any }) {
     if (settings) {
       this._layout = new Layout(settings)
       this._layout.spread(settings.spread, this.settings.minSpreadWidth)
 
       // this.mapping = new Mapping(this._layout.props);
 
-      this._layout.on(EVENTS.LAYOUT.UPDATED, (props, changed) => {
+      this._layout.on(EVENTS.LAYOUT.UPDATED, (props: any, changed: any) => {
         this.emit(EVENTS.RENDITION.LAYOUT, props, changed)
       })
     }
@@ -671,7 +746,7 @@ class Rendition {
    * @param  {string} spread none | auto (TODO: implement landscape, portrait, both)
    * @param  {int} [min] min width to use spreads at
    */
-  spread(spread, min) {
+  spread(spread: string, min: number) {
     this.settings.spread = spread
 
     if (min) {
@@ -691,7 +766,7 @@ class Rendition {
    * Adjust the direction of the rendition
    * @param  {string} dir
    */
-  direction(dir) {
+  direction(dir: string) {
     this.settings.direction = dir || 'ltr'
 
     if (this.manager) {
@@ -711,9 +786,9 @@ class Rendition {
    */
   reportLocation() {
     return this.q.enqueue(
-      function reportedLocation() {
+      function reportedLocation(this: any) {
         requestAnimationFrame(
-          function reportedLocationAfterRAF() {
+          function reportedLocationAfterRAF(this: any) {
             var location = this.manager.currentLocation()
             if (location && location.then && typeof location.then === 'function') {
               location.then(
@@ -803,7 +878,7 @@ class Rendition {
    * @returns {displayedLocation}
    * @private
    */
-  located(location) {
+  located(location: string | any[]) {
     if (!location.length) {
       return {}
     }
@@ -903,12 +978,12 @@ class Rendition {
    * @private
    * @param  {Contents} view contents
    */
-  passEvents(contents) {
-    DOM_EVENTS.forEach((e) => {
-      contents.on(e, (ev) => this.triggerViewEvent(ev, contents))
+  passEvents(contents: Contents) {
+    DOM_EVENTS.forEach((e: any) => {
+      contents.on(e, (ev: Event) => this.triggerViewEvent(ev, contents))
     })
 
-    contents.on(EVENTS.CONTENTS.SELECTED, (e) => this.triggerSelectedEvent(e, contents))
+    contents.on(EVENTS.CONTENTS.SELECTED, (e: string) => this.triggerSelectedEvent(e, contents))
   }
 
   /**
@@ -916,7 +991,7 @@ class Rendition {
    * @private
    * @param  {event} e
    */
-  triggerViewEvent(e, contents) {
+  triggerViewEvent(e: Event, contents: Contents) {
     this.emit(e.type, e, contents)
   }
 
@@ -925,7 +1000,7 @@ class Rendition {
    * @private
    * @param  {string} cfirange
    */
-  triggerSelectedEvent(cfirange, contents) {
+  triggerSelectedEvent(cfirange: string, contents: Contents) {
     /**
      * Emit that a text selection has occurred
      * @event selected
@@ -941,7 +1016,7 @@ class Rendition {
    * @private
    * @param  {EpubCFI} cfirange
    */
-  triggerMarkEvent(cfiRange, data, contents) {
+  triggerMarkEvent(cfiRange: string, data: unknown, contents: Contents) {
     /**
      * Emit that a mark was clicked
      * @event markClicked
@@ -959,9 +1034,9 @@ class Rendition {
    * @param  {string} ignoreClass
    * @return {range}
    */
-  getRange(cfi, ignoreClass) {
+  getRange(cfi: string, ignoreClass: string) {
     var _cfi = new EpubCFI(cfi)
-    var found = this.manager.visible().filter(function (view) {
+    var found = this.manager.visible().filter(function (view: { index: any }) {
       if (_cfi.spinePos === view.index) return true
     })
 
@@ -980,7 +1055,13 @@ class Rendition {
    * @param {object} styles - Custom CSS styles to apply
    * @returns {Promise<any>} Promise that resolves to the created annotation
    */
-  highlightRange(cfiRange, data = {}, cb, className = 'epubjs-hl', styles = {}) {
+  highlightRange(
+    cfiRange: string,
+    data = {},
+    cb?: () => void,
+    className = 'epubjs-hl',
+    styles = {}
+  ) {
     if (!this.manager) {
       return Promise.reject(new Error('Rendition manager not available'))
     }
@@ -995,7 +1076,7 @@ class Rendition {
       }
 
       // Find the view that contains this CFI range
-      const found = this.manager.visible().filter(function (view) {
+      const found = this.manager.visible().filter(function (view: { index: any }) {
         return rangeCfi.spinePos === view.index
       })
 
@@ -1045,7 +1126,7 @@ class Rendition {
    * @param {string} cfiRange - CFI range string to remove highlight from
    * @returns {Promise<boolean>} Promise that resolves to true if highlight was removed, false if not found
    */
-  removeHighlight(cfiRange) {
+  removeHighlight(cfiRange: string) {
     if (!this.manager) {
       return Promise.reject(new Error('Rendition manager not available'))
     }
@@ -1060,7 +1141,7 @@ class Rendition {
       }
 
       // Find the view that contains this CFI range
-      const found = this.manager.visible().filter(function (view) {
+      const found = this.manager.visible().filter(function (view: { index: any }) {
         return rangeCfi.spinePos === view.index
       })
 
@@ -1092,7 +1173,7 @@ class Rendition {
    * @param  {Contents} contents
    * @private
    */
-  adjustImages(contents) {
+  adjustImages(contents: Contents) {
     if (this._layout.name === 'pre-paginated') {
       return new Promise(function (resolve) {
         resolve()
@@ -1220,8 +1301,7 @@ class Rendition {
    * Get the paragraphs from the currently viewed page (not the entire section/chapter)
    * @returns {Array<{text: string, cfiRange: string}>|null} Array of paragraph objects containing text content and CFI range, or null if no view is visible
    */
-  getCurrentViewParagraphs(options = {}) {
-    const { minLength = 50 } = options
+  getCurrentViewParagraphs(): ParagraphWithCFI[] | null {
     if (!this.manager) {
       return null
     }
@@ -1327,7 +1407,7 @@ class Rendition {
      * Paragraphs array
      * @type {Paragraph[]}
      */
-    let paragraphs
+    let paragraphs: any[]
     if (hasNextPageInSection) {
       paragraphs = await this._getNextPageParagraphsInSectionAsync(currentView, currentSection)
     } else {
@@ -1336,7 +1416,7 @@ class Rendition {
     }
 
     if (minLength > 0) {
-      paragraphs = paragraphs.filter((p) => p.text.length >= minLength)
+      paragraphs = paragraphs.filter((p: { text: string | any[] }) => p.text.length >= minLength)
     }
 
     return paragraphs
@@ -1349,7 +1429,10 @@ class Rendition {
    * @param {Section} currentSection - The current section location data
    * @returns {Promise<Paragraph[]>} Promise that resolves to array of paragraph objects containing text content and CFI range, or null if no next page exists
    */
-  async _getNextPageParagraphsInSectionAsync(currentView, currentSection) {
+  async _getNextPageParagraphsInSectionAsync(
+    currentView: { contents: Contents; section: { cfiBase: any } },
+    currentSection: { pages: string | any[] }
+  ) {
     try {
       const layout = this.manager.layout
       const currentPage = currentSection.pages[currentSection.pages.length - 1]
@@ -1409,7 +1492,7 @@ class Rendition {
    * @returns {boolean} True if there's a next page in the current section
    * @private
    */
-  _hasNextPageInCurrentSection(currentView, currentSection) {
+  _hasNextPageInCurrentSection(currentView: View, currentSection: Section) {
     // Use page numbers from location data
     if (!currentSection.pages || !currentSection.totalPages) {
       return false
@@ -1428,7 +1511,7 @@ class Rendition {
    * @returns {Promise<Paragraph[]>} Promise that resolves to array of paragraph objects
    * @private
    */
-  async _getFirstPageParagraphsInNextSection(currentView) {
+  async _getFirstPageParagraphsInNextSection(currentView: View) {
     const nextSection = currentView.section.next()
 
     if (!nextSection) {
@@ -1543,12 +1626,12 @@ class Rendition {
    * @returns {Object|null} The CFI mapping for the first page
    * @private
    */
-  _getFirstPageMapping(contents, section) {
+  _getFirstPageMapping(contents: Contents, section: Section) {
     const layout = this.manager.layout
 
     // For the first page, start at 0 and use page width/height
     let start = 0
-    let end
+    let end: any
 
     if (this.manager.settings.axis === 'horizontal') {
       end = layout.pageWidth
@@ -1598,7 +1681,7 @@ class Rendition {
      * Paragraphs array
      * @type {Paragraph[]}
      */
-    let paragraphs
+    let paragraphs: any[]
     if (hasPreviousPageInSection) {
       paragraphs = await this._getPreviousPageParagraphsInSectionAsync(currentView, currentSection)
     } else {
@@ -1608,7 +1691,7 @@ class Rendition {
     }
 
     if (minLength > 0) {
-      paragraphs = paragraphs.filter((p) => p.text.length >= minLength)
+      paragraphs = paragraphs.filter((p: { text: string | any[] }) => p.text.length >= minLength)
     }
 
     return paragraphs
@@ -1620,7 +1703,7 @@ class Rendition {
    * @param {Section} currentSection - The current section location data
    * @returns {Promise<Paragraph[]>} Promise that resolves to array of paragraph objects containing text content and CFI range, or null if no previous page exists
    */
-  async _getPreviousPageParagraphsInSectionAsync(currentView, currentSection) {
+  async _getPreviousPageParagraphsInSectionAsync(currentView: View, currentSection: Section) {
     try {
       const layout = this.manager.layout
       const currentPage = currentSection.pages[0] // First page in the current view
@@ -1680,7 +1763,7 @@ class Rendition {
    * @returns {boolean} True if there's a previous page in the current section
    * @private
    */
-  _hasPreviousPageInCurrentSection(currentView, currentSection) {
+  _hasPreviousPageInCurrentSection(currentView: View, currentSection: Section) {
     // Use page numbers from location data
     if (!currentSection.pages || !currentSection.totalPages) {
       return false
@@ -1699,7 +1782,7 @@ class Rendition {
    * @returns {Promise<Paragraph[]>} Promise that resolves to array of paragraph objects
    * @private
    */
-  async _getLastPageParagraphsInPreviousSection(currentView) {
+  async _getLastPageParagraphsInPreviousSection(currentView: View) {
     const previousSection = currentView.section.prev()
 
     if (!previousSection) {
@@ -1819,11 +1902,11 @@ class Rendition {
    * @returns {Object|null} The CFI mapping for the last page
    * @private
    */
-  _getLastPageMapping(contents, section) {
+  _getLastPageMapping(contents: Contents, section: Section) {
     const layout = this.manager.layout
 
     // For the last page, calculate based on total content height
-    let start, end
+    let start: number, end: number
 
     if (this.manager.settings.axis === 'horizontal') {
       // For horizontal layout, get the last page width
@@ -1847,8 +1930,8 @@ class Rendition {
    * @returns {Array<{text: string, cfiRange: string}>} Array of paragraph objects
    * @private
    */
-  _getParagraphsFromRange(range, contents) {
-    const paragraphs = []
+  _getParagraphsFromRange(range: Range, contents: Contents): ParagraphWithCFI[] {
+    const paragraphs: ParagraphWithCFI[] = []
 
     try {
       // Get the full text from the range (same as getCurrentViewText)
@@ -1971,7 +2054,7 @@ class Rendition {
           // This creates a single-point CFI that uniquely identifies this paragraph element
           const elementCfi = new EpubCFI(blockElement, contents.cfiBase, this.settings.ignoreClass)
 
-          let startCfi, endCfi, cfiRange
+          let startCfi: string, endCfi: string, cfiRange: string
 
           // For paragraphs, we treat each as a single element with the same start and end CFI
           // This matches the test expectation that startCfi === endCfi for single paragraphs
@@ -2044,7 +2127,7 @@ class Rendition {
    * @returns {Array<Text>} Array of text nodes
    * @private
    */
-  _getTextNodesInRange(range) {
+  _getTextNodesInRange(range: Range) {
     const textNodes = []
 
     try {
@@ -2074,7 +2157,7 @@ class Rendition {
         }
       )
 
-      let node
+      let node: Node | null
       while ((node = walker.nextNode())) {
         textNodes.push(node)
       }
@@ -2091,7 +2174,7 @@ class Rendition {
    * @returns {Element|null} The containing block element or null
    * @private
    */
-  _findContainingBlockElement(textNode) {
+  _findContainingBlockElement(textNode: Text) {
     const blockSelectors =
       'p, div, h1, h2, h3, h4, h5, h6, li, blockquote, pre, article, section, aside, header, footer, main, nav, figure, figcaption, dd, dt'
 
@@ -2126,9 +2209,9 @@ class Rendition {
    * @param  {Contents} contents
    * @private
    */
-  handleLinks(contents) {
+  handleLinks(contents: Contents) {
     if (contents) {
-      contents.on(EVENTS.CONTENTS.LINK_CLICKED, (href) => {
+      contents.on(EVENTS.CONTENTS.LINK_CLICKED, (href: any) => {
         let relative = this.book.path.relative(href)
         this.display(relative)
       })
@@ -2142,7 +2225,7 @@ class Rendition {
    * @param  {Section} section
    * @private
    */
-  injectStylesheet(doc, section) {
+  injectStylesheet(doc: Document, section: Section) {
     let style = doc.createElement('link')
     style.setAttribute('type', 'text/css')
     style.setAttribute('rel', 'stylesheet')
@@ -2157,7 +2240,13 @@ class Rendition {
    * @param  {Section} section
    * @private
    */
-  injectScript(doc, section) {
+  injectScript(
+    doc: {
+      createElement: (arg0: string) => any
+      getElementsByTagName: (arg0: string) => { appendChild: (arg0: any) => void }[]
+    },
+    section: any
+  ) {
     let script = doc.createElement('script')
     script.setAttribute('type', 'text/javascript')
     script.setAttribute('src', this.settings.script)
@@ -2172,7 +2261,13 @@ class Rendition {
    * @param  {Section} section
    * @private
    */
-  injectIdentifier(doc, section) {
+  injectIdentifier(
+    doc: {
+      createElement: (arg0: string) => any
+      getElementsByTagName: (arg0: string) => { appendChild: (arg0: any) => void }[]
+    },
+    section: any
+  ) {
     let ident = this.book.packaging.metadata.identifier
     let meta = doc.createElement('meta')
     meta.setAttribute('name', 'dc.relation.ispartof')
@@ -2184,6 +2279,8 @@ class Rendition {
 }
 
 //-- Enable binding events to Renderer
-EventEmitter(Rendition.prototype)
+//EventEmitter(Rendition.prototype)
 
 export default Rendition
+
+// export type { Rendition }

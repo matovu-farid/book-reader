@@ -6,6 +6,32 @@ import Queue from '../../utils/queue'
 import Stage from '../helpers/stage'
 import Views from '../helpers/views'
 import { EVENTS } from '../../utils/constants'
+import type { EpubCFIPair } from '@renderer/epubjs/types/mapping'
+import type Layout from '../../layout'
+
+export interface ViewLocation {
+  index: number
+  href: string
+  pages: number[]
+  totalPages: number
+  mapping: EpubCFIPair
+}
+export interface ViewSettings {
+  ignoreClass?: string
+  axis?: string
+  flow?: string
+  layout?: Layout
+  method?: string
+  width?: number
+  height?: number
+  forceEvenPages?: boolean
+  allowScriptedContent?: boolean
+}
+export interface ManagerOptions extends ViewSettings {
+  infinite?: boolean
+  overflow?: string
+  [key: string]: any
+}
 
 class DefaultViewManager {
   constructor(options) {
