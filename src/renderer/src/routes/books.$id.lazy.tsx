@@ -93,6 +93,7 @@ function BookView(): JSX.Element {
   // Update rendition state when ref becomes available
   useEffect(() => {
     rendition.current?.on('rendered', () => {
+      if (rendition.current == renditionState) return
       setRenditionState(rendition.current)
     })
   }, [])

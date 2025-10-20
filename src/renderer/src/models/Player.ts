@@ -42,8 +42,8 @@ export class Player extends EventEmitter {
       this.audioElement = new Audio()
       this.audioElement.addEventListener('ended', this.handleEnded)
       this.audioElement.addEventListener('error', this.handleError)
-      this.rendition.on(EVENTS.RENDITION.LOCATION_CHANGED, this.handleLocationChanged)
     })
+    this.rendition.on(EVENTS.RENDITION.LOCATION_CHANGED, this.handleLocationChanged)
     this.audioCache = new Map()
     this.priority = 3
     this.errors = []
@@ -100,12 +100,6 @@ export class Player extends EventEmitter {
 
   public setParagraphs(paragraphs: ParagraphWithCFI[]) {
     this.paragraphs = paragraphs
-  }
-  public setNextPageParagraphs(paragraphs: ParagraphWithCFI[]) {
-    this.nextPageParagraphs = paragraphs
-  }
-  public setPreviousPageParagraphs(paragraphs: ParagraphWithCFI[]) {
-    this.previousPageParagraphs = paragraphs
   }
 
   public async play() {

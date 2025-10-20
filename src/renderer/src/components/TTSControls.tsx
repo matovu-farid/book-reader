@@ -9,7 +9,7 @@ import {
   Error as ErrorIcon,
   Close as CloseIcon
 } from '@mui/icons-material'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { PlayingState } from '@renderer/stores/ttsStore'
 import { Player } from '@renderer/models/Player'
 import type { Rendition } from '@epubjs'
@@ -27,7 +27,10 @@ export function TTSControls({ bookId, rendition, disabled = false }: TTSControls
   const error = errors.join('\n')
   const [player] = useState<Player>(new Player(rendition, bookId))
   const [playingState, setPlayingState] = useState<PlayingState>(player.getPlayingState())
-  player.on('playingStateChanged', setPlayingState)
+  useEffect(() => {
+    player.on('playingStateChanged', setPlayingState)
+  },[])
+ 
 
   // Show error snackbar when error occurs
   const handleErrorClose = () => {
