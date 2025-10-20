@@ -4,7 +4,7 @@ import { type SwipeEventData } from 'react-swipeable'
 import { EpubView, type IEpubViewProps } from './epub_viewer'
 import type { IEpubViewStyle } from './epub_viewer/style'
 import { ReactReaderStyle as defaultStyles, type IReactReaderStyle } from './style'
-import { type NavItem } from '@epubjs'
+import { type NavItem } from '@renderer/epubjs/src'
 import { SwipeWrapper, TableOfContents, TocToggleButton, NavigationArrows } from './components'
 import type { ParagraphWithCFI } from 'src/shared/types'
 
