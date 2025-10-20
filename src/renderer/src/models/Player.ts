@@ -1,4 +1,4 @@
-import { Rendition } from '@renderer/epubjs/types'
+import type { Rendition } from '@epubjs'
 import { ParagraphWithCFI } from 'src/shared/types'
 import EventEmitter from 'events'
 import { EVENTS } from '@renderer/epubjs/src/utils/constants'

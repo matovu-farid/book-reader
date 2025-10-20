@@ -12,7 +12,7 @@ import {
 import { useState } from 'react'
 import { PlayingState } from '@renderer/stores/ttsStore'
 import { Player } from '@renderer/models/Player'
-import { Rendition } from '@renderer/epubjs/types'
+import type { Rendition } from '@epubjs'
 
 interface TTSControlsProps {
   bookId: string

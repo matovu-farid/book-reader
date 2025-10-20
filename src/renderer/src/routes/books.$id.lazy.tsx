@@ -7,7 +7,7 @@ import { toast } from 'react-toastify'
 import { Book } from 'src/shared/types'
 import { useEffect, useRef, useState } from 'react'
 import { Button, FormControlLabel, IconButton, Radio, RadioGroup } from '@mui/material'
-import { Rendition } from '@renderer/epubjs/src'
+import type { Rendition } from '@epubjs'
 import Menu from '@mui/material/Menu'
 import { usePopupState, bindTrigger, bindMenu } from 'material-ui-popup-state/hooks'
 import { ThemeType } from '@renderer/themes/common'
@@ -31,7 +31,7 @@ function updateTheme(rendition: Rendition, theme: ThemeType) {
 function BookView(): JSX.Element {
   const { id } = Route.useParams()
   const rendition = useRef<Rendition | undefined>(undefined)
-  const [renditionState, setRenditionState] = useState<Rendition | null>(null)
+  const [renditionState, setRenditionState] = useState<Rendition | null>()
   const [theme, setTheme] = useState<ThemeType>(ThemeType.White)
   const popupState = usePopupState({ variant: 'popover', popupId: 'demoMenu' })
   useEffect(() => {
@@ -90,34 +90,12 @@ function BookView(): JSX.Element {
     }
   })
 
-  // TTS hook - use state variable instead of ref
-  // const tts = useTTS({
-  //   bookId: book?.id || '',
-  //   rendition: renditionState,
-  //   onNavigateToPreviousPage: (playingState: PlayingState) => {
-  //     // Navigate to previous page
-  //     if (rendition.current) {
-  //       rendition.current.prev().then(() => {
-  //         if (playingState === PlayingState.Playing) {
-  //           setToLastParagraphIndex()
-  //         }
-  //       })
-  //     }
-  //   },
-  //   onNavigateToNextPage: () => {
-  //     // Navigate to next page
-  //     if (rendition.current) {
-  //       rendition.current.next()
-  //     }
-  //   }
-  // })
-
   // Update rendition state when ref becomes available
   useEffect(() => {
-    if (rendition.current && !renditionState) {
+    rendition.current?.on('rendered', () => {
       setRenditionState(rendition.current)
-    }
-  }, [renditionState])
+    })
+  }, [])
 
   if (isError) return <div className="w-full h-full place-items-center grid"> {error.message}</div>
   if (isPending)
