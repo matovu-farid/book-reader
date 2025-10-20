@@ -1,6 +1,7 @@
 import { Rendition } from '@renderer/epubjs/types'
 import { ParagraphWithCFI } from 'src/shared/types'
 import EventEmitter from 'events'
+import { EVENTS } from '@renderer/epubjs/src/utils/constants'
 export enum PlayingState {
   Playing = 'playing',
   Paused = 'paused',
@@ -17,7 +18,7 @@ export class Player extends EventEmitter {
   private priority: number
   private errors: string[]
   private audioElement: HTMLAudioElement = new Audio()
-  private direction: 'forward' | 'backward'
+
   private nextPageParagraphs: ParagraphWithCFI[]
   private previousPageParagraphs: ParagraphWithCFI[]
   private hasApiKey: boolean
@@ -41,14 +42,29 @@ export class Player extends EventEmitter {
       this.audioElement = new Audio()
       this.audioElement.addEventListener('ended', this.handleEnded)
       this.audioElement.addEventListener('error', this.handleError)
+      this.rendition.on(EVENTS.RENDITION.LOCATION_CHANGED, this.handleLocationChanged)
     })
     this.audioCache = new Map()
     this.priority = 3
     this.errors = []
 
-    this.direction = 'forward'
     this.nextPageParagraphs = []
     this.previousPageParagraphs = []
+  }
+
+  private handleLocationChanged = () => {
+    if (this.playingState !== PlayingState.Playing) return
+    this.stop()
+    this.paragraphs = this.rendition.getCurrentViewParagraphs() || []
+    this.currentParagraphIndex = 0
+    this.rendition.getNextViewParagraphs().then((nextPageParagraphs) => {
+      this.nextPageParagraphs = nextPageParagraphs || []
+    })
+    this.rendition.getPreviousViewParagraphs().then((previousPageParagraphs) => {
+      this.previousPageParagraphs = previousPageParagraphs?.reverse() || []
+    })
+
+    this.play()
   }
   public cleanup() {
     this.audioElement.removeEventListener('ended', this.handleEnded)
@@ -57,8 +73,6 @@ export class Player extends EventEmitter {
     this.audioElement.src = ''
   }
   private handleEnded = () => {
-    // Safely remove current highlight
-
     try {
       const currentParagraph = this.getCurrentParagraph()
       if (!currentParagraph) return
@@ -82,20 +96,6 @@ export class Player extends EventEmitter {
       return null
     }
     return this.paragraphs[this.currentParagraphIndex]
-  }
-  private getNextParagraph() {
-    const nextIndex = this.currentParagraphIndex + 1
-    if (nextIndex >= this.paragraphs.length || nextIndex < 0) {
-      return null
-    }
-    return this.paragraphs[nextIndex]
-  }
-  private getPreviousParagraph() {
-    const previousIndex = this.currentParagraphIndex - 1
-    if (previousIndex >= this.paragraphs.length || previousIndex < 0) {
-      return null
-    }
-    return this.paragraphs[previousIndex]
   }
 
   public setParagraphs(paragraphs: ParagraphWithCFI[]) {
@@ -289,14 +289,11 @@ export class Player extends EventEmitter {
     await this.play()
   }
   public prev = async () => {
-    this.direction = 'backward'
     const prevIndex = this.currentParagraphIndex - 1
     this.updateParagaph(prevIndex)
   }
   public next = async () => {
     const nextIndex = this.currentParagraphIndex + 1
-
-    this.direction = 'forward'
 
     this.updateParagaph(nextIndex)
   }
