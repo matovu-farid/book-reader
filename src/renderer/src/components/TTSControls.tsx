@@ -45,8 +45,9 @@ export function TTSControls({ bookId, rendition, disabled = false }: TTSControls
   const [errors, setErrors] = useState<string[]>([])
 
   const error = errors.join('\n')
-  const [player, _] = useState<Player>(new Player(rendition, bookId))
-  const playingState = player.getPlayingState()
+  const [player] = useState<Player>(new Player(rendition, bookId))
+  const [playingState, setPlayingState] = useState<PlayingState>(player.getPlayingState())
+  player.on('playingStateChanged', setPlayingState)
 
   // Show error snackbar when error occurs
   const handleErrorClose = () => {
@@ -62,6 +63,14 @@ export function TTSControls({ bookId, rendition, disabled = false }: TTSControls
   }
 
   const handlePlay = () => {
+    if (playingState === PlayingState.Playing) {
+      player.pause()
+      return
+    }
+    if (playingState === PlayingState.Paused) {
+      player.resume()
+      return
+    }
     return player.play()
   }
 
@@ -78,7 +87,6 @@ export function TTSControls({ bookId, rendition, disabled = false }: TTSControls
   }
 
   const getPlayIcon = () => {
-    const playingState = player.getPlayingState()
     if (playingState === PlayingState.Loading) {
       return <CircularProgress size={24} color="inherit" />
     }
@@ -165,30 +173,6 @@ export function TTSControls({ bookId, rendition, disabled = false }: TTSControls
             </IconButton>
           </span>
         </Tooltip>
-
-        {/* Stop Button */}
-        <Tooltip title="Stop">
-          <span>
-            <IconButton
-              size="large"
-              onClick={handleStop}
-              disabled={disabled || playingState !== PlayingState.Playing}
-              sx={{
-                padding: 1,
-                color: '#ffffff',
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                },
-                '&:disabled': {
-                  color: 'rgba(255, 255, 255, 0.3)'
-                }
-              }}
-            >
-              <StopIcon sx={{ fontSize: 24 }} />
-            </IconButton>
-          </span>
-        </Tooltip>
-
         {/* Next Button */}
         <Tooltip title="Next Paragraph">
           <span>
@@ -208,6 +192,28 @@ export function TTSControls({ bookId, rendition, disabled = false }: TTSControls
               }}
             >
               <NextIcon sx={{ fontSize: 24 }} />
+            </IconButton>
+          </span>
+        </Tooltip>
+        {/* Stop Button */}
+        <Tooltip title="Stop">
+          <span>
+            <IconButton
+              size="large"
+              onClick={handleStop}
+              disabled={disabled || playingState !== PlayingState.Playing}
+              sx={{
+                padding: 1,
+                color: '#ffffff',
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                },
+                '&:disabled': {
+                  color: 'rgba(255, 255, 255, 0.3)'
+                }
+              }}
+            >
+              <StopIcon sx={{ fontSize: 24 }} />
             </IconButton>
           </span>
         </Tooltip>
