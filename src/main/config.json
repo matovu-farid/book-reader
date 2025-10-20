@@ -1,0 +1,12 @@
+{
+    "development": {
+        "player": {
+        "recordPlayingState": true
+        }
+    },
+    "production": {
+        "player": {
+        "recordPlayingState": false
+        }
+    }
+}

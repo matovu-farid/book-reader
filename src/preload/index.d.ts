@@ -17,6 +17,7 @@ declare global {
   interface Window {
     api: unknown
     functions: {
+      shouldDebug: () => Promise<boolean>
       chooseFiles: () => Promise<string[]>
       getCoverImage: (filePath: string) => Promise<string | null>
       getBooks: () => Promise<Book[]>

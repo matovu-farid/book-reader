@@ -22,6 +22,7 @@ if (process.contextIsolated) {
       getTTSAudioPath: (bookId: string, cfiRange: string) =>
         ipcRenderer.invoke('tts:get-audio-path', bookId, cfiRange),
       getTTSApiKeyStatus: () => ipcRenderer.invoke('tts:get-api-key-status'),
+      shouldDebug: () => ipcRenderer.invoke('tts:should-debug'),
       getTTSQueueStatus: () => ipcRenderer.invoke('tts:get-queue-status'),
       clearTTSCache: (bookId: string) => ipcRenderer.invoke('tts:clear-book-cache', bookId),
       getTTSCacheSize: (bookId: string) => ipcRenderer.invoke('tts:get-book-cache-size', bookId),

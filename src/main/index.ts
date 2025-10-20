@@ -11,6 +11,7 @@ import {
   REDUX_DEVTOOLS,
   REACT_DEVELOPER_TOOLS
 } from 'electron-devtools-installer'
+import config from './config.json'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -101,6 +102,12 @@ function iPCHandlers(): void {
       console.error('Failed to get API key status:', error)
       return false
     }
+  })
+  ipcMain.handle('tts:should-debug', (): boolean => {
+    if (process.env.NODE_ENV === 'development') {
+      return config.development.player.recordPlayingState
+    }
+    return config.production.player.recordPlayingState
   })
 
   ipcMain.handle('tts:get-queue-status', () => {

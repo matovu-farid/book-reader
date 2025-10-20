@@ -7,13 +7,14 @@ import {
   SkipNext as NextIcon,
   VolumeUp as VolumeIcon,
   Error as ErrorIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  BugReport as DebugIcon
 } from '@mui/icons-material'
 import { useEffect, useState } from 'react'
 import { PlayingState } from '@renderer/stores/ttsStore'
 import { Player } from '@renderer/models/Player'
 import type { Rendition } from '@epubjs'
-
+import { useDebug } from '@renderer/hooks/useDebug'
 interface TTSControlsProps {
   bookId: string
   rendition: Rendition
@@ -27,10 +28,11 @@ export function TTSControls({ bookId, rendition, disabled = false }: TTSControls
   const error = errors.join('\n')
   const [player] = useState<Player>(new Player(rendition, bookId))
   const [playingState, setPlayingState] = useState<PlayingState>(player.getPlayingState())
+  const { setIsDebugging, shouldDebug } = useDebug(player)
+
   useEffect(() => {
     player.on('playingStateChanged', setPlayingState)
-  },[])
- 
+  }, [])
 
   // Show error snackbar when error occurs
   const handleErrorClose = () => {
@@ -200,6 +202,30 @@ export function TTSControls({ bookId, rendition, disabled = false }: TTSControls
             </IconButton>
           </span>
         </Tooltip>
+        {/* Debug Button */}
+        {shouldDebug && (
+          <Tooltip title="Debug">
+            <span>
+              <IconButton
+                size="large"
+                onClick={() => setIsDebugging((isDebugging) => !isDebugging)}
+                disabled={disabled || playingState !== PlayingState.Playing}
+                sx={{
+                  padding: 1,
+                  color: '#ffffff',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                  },
+                  '&:disabled': {
+                    color: 'rgba(255, 255, 255, 0.3)'
+                  }
+                }}
+              >
+                <DebugIcon sx={{ fontSize: 24 }} />
+              </IconButton>
+            </span>
+          </Tooltip>
+        )}
 
         {/* Error Icon (if there's an error) */}
         {errors.length > 0 && (
