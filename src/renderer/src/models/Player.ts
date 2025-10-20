@@ -1,34 +1,43 @@
 import { Rendition } from '@renderer/epubjs/types'
 import { ParagraphWithCFI } from 'src/shared/types'
+import EventEmitter from 'events'
 export enum PlayingState {
   Playing = 'playing',
   Paused = 'paused',
   Stopped = 'stopped',
   Loading = 'loading'
 }
-export class Player {
+export class Player extends EventEmitter {
   private rendition: Rendition
-  private playingState: PlayingState
+  private playingState: PlayingState = PlayingState.Stopped
   private currentParagraphIndex: number
-  private paragraphs: ParagraphWithCFI[]
+  private paragraphs: ParagraphWithCFI[] = []
   private bookId: string
   private audioCache: Map<string, string>
   private priority: number
   private errors: string[]
-  private audioElement: HTMLAudioElement
+  private audioElement: HTMLAudioElement = new Audio()
   private direction: 'forward' | 'backward'
   private nextPageParagraphs: ParagraphWithCFI[]
   private previousPageParagraphs: ParagraphWithCFI[]
+  private hasApiKey: boolean
   constructor(rendition: Rendition, bookId: string) {
-    console.log({ rendition })
+    super()
     this.rendition = rendition
-    this.playingState = PlayingState.Stopped
+    this.setPlayingState(PlayingState.Stopped)
     this.currentParagraphIndex = 0
     this.bookId = bookId
+    this.hasApiKey = false
+    this.checkApiKey()
     // this.paragraphs = rendition.getCurrentViewParagraphs() || []
     rendition.on('rendered', () => {
       this.paragraphs = rendition.getCurrentViewParagraphs() || []
-      console.log({ paragraphs: this.paragraphs })
+      rendition.getNextViewParagraphs().then((nextPageParagraphs) => {
+        this.nextPageParagraphs = nextPageParagraphs || []
+      })
+      rendition.getPreviousViewParagraphs().then((previousPageParagraphs) => {
+        this.previousPageParagraphs = previousPageParagraphs?.reverse() || []
+      })
       this.audioElement = new Audio()
       this.audioElement.addEventListener('ended', this.handleEnded)
       this.audioElement.addEventListener('error', this.handleError)
@@ -65,7 +74,7 @@ export class Player {
     console.error('Audio error:', e)
     this.errors.push('Audio playback failed')
 
-    this.playingState = PlayingState.Stopped
+    this.setPlayingState(PlayingState.Stopped)
   }
   private getCurrentParagraph() {
     if (this.currentParagraphIndex >= this.paragraphs.length || this.currentParagraphIndex < 0) {
@@ -100,31 +109,20 @@ export class Player {
   }
 
   public async play() {
-    console.debug('🎵 Player.play() called')
-    console.debug('🎵 Current playing state:', this.playingState)
+    this.setPlayingState(PlayingState.Playing)
 
-    if (this.playingState === PlayingState.Playing) {
-      console.debug('🎵 Already playing, returning early')
-      return
-    }
-
-    this.playingState = PlayingState.Playing
-    console.debug('🎵 Set playing state to:', this.playingState)
-
-    if (!this.hasApiKey()) {
+    if (!this.hasApiKey) {
       console.error('🎵 No API key available')
       this.errors.push('OpenAI API key not configured')
       return
     }
-    console.log('🎵 Has API Key:', this.hasApiKey())
 
     if (this.paragraphs.length === 0) {
       console.error('🎵 No paragraphs available')
       this.errors.push('No paragraphs available to play')
       return
     }
-    console.debug('🎵 Total paragraphs available:', this.paragraphs.length)
-
+    // check if the current paragraph index is valid
     if (this.currentParagraphIndex >= this.paragraphs.length || this.currentParagraphIndex < 0) {
       console.error(
         '🎵 Invalid paragraph index:',
@@ -135,23 +133,16 @@ export class Player {
       this.errors.push('No paragraphs available to play')
       return
     }
-    console.debug('🎵 Current paragraph index:', this.currentParagraphIndex)
 
     const currentParagraph = this.paragraphs[this.currentParagraphIndex]
-    console.debug('🎵 Current paragraph:', {
-      cfiRange: currentParagraph.cfiRange,
-      textLength: currentParagraph.text.length,
-      textPreview: currentParagraph.text.substring(0, 100) + '...'
-    })
 
     // Highlight current paragraph and store reference
-    console.debug('🎵 Highlighting paragraph with CFI:', currentParagraph.cfiRange)
+
     this.highlightParagraph(currentParagraph)
 
     // Request audio with high priority
-    console.debug('🎵 Requesting audio for paragraph...')
+
     const audioPath = await this.requestAudio(currentParagraph, this.getNextPriority())
-    console.debug('🎵 Audio path received:', audioPath)
 
     if (!audioPath) {
       console.error('🎵 Failed to get audio path')
@@ -159,20 +150,16 @@ export class Player {
       return
     }
 
-    console.debug('🎵 Setting up audio element...')
     this.audioElement.pause()
     this.audioElement.currentTime = 0
 
     // Set new source and wait for it to be ready
     this.audioElement.src = audioPath
     this.audioElement.load()
-    console.debug('🎵 Audio element loaded with src:', audioPath)
 
     try {
-      console.debug('🎵 Waiting for audio to be ready...')
       await new Promise((resolve, reject) => {
         const handleCanPlay = () => {
-          console.debug('🎵 Audio can play through - ready to play')
           this.audioElement?.removeEventListener('canplaythrough', handleCanPlay)
           this.audioElement?.removeEventListener('error', handleError)
           resolve(undefined)
@@ -187,54 +174,61 @@ export class Player {
         this.audioElement?.addEventListener('error', handleError, { once: true })
       })
 
-      console.debug('🎵 Starting audio playback...')
       await this.audioElement.play()
-      this.playingState = PlayingState.Playing
-      console.debug('🎵 Audio playback started successfully')
+      this.setPlayingState(PlayingState.Playing)
 
       // Prefetch next paragraphs
-      console.debug('🎵 Starting prefetch for next paragraphs...')
+
       this.prefetchAudio(this.currentParagraphIndex + 1, 3)
+      this.prefetchAudio(this.currentParagraphIndex - 3, 3)
     } catch (error) {
       console.error('🎵 Playback failed:', error)
       this.errors.push(
         `Playback failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       )
-      this.playingState = PlayingState.Stopped
+      this.setPlayingState(PlayingState.Stopped)
     }
   }
-  public pause = () => {
-    if (this.audioElement && !this.audioElement.paused) {
-      this.audioElement.pause()
+  public pause() {
+    if (this.audioElement.paused) return
+    this.audioElement.pause()
 
-      this.playingState = PlayingState.Paused
-    }
+    this.setPlayingState(PlayingState.Paused)
   }
-  public resume = () => {
+  public resume() {
     if (!this.audioElement.paused) return
     this.audioElement.play().catch((error) => {
       console.error('Failed to resume audio:', error)
       this.errors.push(`Failed to resume audio: ${error.message}`)
     })
-    this.playingState = PlayingState.Playing
+    this.setPlayingState(PlayingState.Playing)
   }
 
-  public stop = () => {
-    if (this.audioElement) {
-      this.audioElement.pause()
-      this.audioElement.currentTime = 0
-    }
+  public stop() {
+    this.audioElement.pause()
+    this.audioElement.currentTime = 0
+
     const currentParagraph = this.getCurrentParagraph()
     if (!currentParagraph) return
 
     this.rendition.removeHighlight(currentParagraph.cfiRange)
 
-    this.playingState = PlayingState.Stopped
+    this.setPlayingState(PlayingState.Stopped)
   }
   private prefetchNextPageAudio = (count: number = 3) => {
     if (this.nextPageParagraphs.length === 0) return
     for (let i = 0; i < Math.min(count, this.nextPageParagraphs.length); i++) {
       const paragraph = this.nextPageParagraphs[i]
+      this.requestAudio(paragraph, this.getPrefetchPriority()).catch((error) => {
+        console.warn(`Prefetch failed for next page paragraph ${i}:`, error)
+      })
+    }
+  }
+  private prefetchPrevPageAudio = (count: number = 3) => {
+    if (this.previousPageParagraphs.length === 0) return
+
+    for (let i = 0; i < Math.min(count, this.previousPageParagraphs.length); i++) {
+      const paragraph = this.previousPageParagraphs[i]
       this.requestAudio(paragraph, this.getPrefetchPriority()).catch((error) => {
         console.warn(`Prefetch failed for next page paragraph ${i}:`, error)
       })
@@ -280,7 +274,7 @@ export class Player {
     if (index == 0) {
       // Request audio for the previous paragraphs of the previous page
       if (this.playingState === PlayingState.Playing) {
-        this.prefetchAudio(index - 1, 3)
+        this.prefetchPrevPageAudio(3)
       }
     }
     // first remove the current paragraph highlight and pause audio
@@ -292,46 +286,7 @@ export class Player {
     this.currentParagraphIndex = index
     currentParagraph = this.getCurrentParagraph()
     if (!currentParagraph) return
-
-    this.highlightParagraph(currentParagraph)
-
-    this.audioElement.pause()
-
-    if (this.playingState !== PlayingState.Playing) return
-    try {
-      const audioPath = await this.requestAudio(currentParagraph, this.getNextPriority())
-
-      if (!audioPath) return
-      this.audioElement.pause()
-      this.audioElement.currentTime = 0
-      this.audioElement.src = audioPath
-      this.audioElement.load()
-
-      await new Promise((resolve, reject) => {
-        const handleCanPlay = () => {
-          this.audioElement.removeEventListener('canplaythrough', handleCanPlay)
-          this.audioElement.removeEventListener('error', handleError)
-          resolve(undefined)
-        }
-        const handleError = (e: Event) => {
-          this.audioElement.removeEventListener('canplaythrough', handleCanPlay)
-          this.audioElement.removeEventListener('error', handleError)
-          reject(e)
-        }
-        this.audioElement.addEventListener('canplaythrough', handleCanPlay, { once: true })
-        this.audioElement.addEventListener('error', handleError, { once: true })
-      })
-
-      await this.audioElement.play()
-      this.prefetchAudio(index + 1, 3)
-      this.prefetchAudio(index - 3, 3)
-    } catch (error) {
-      console.error('Failed to play next paragraph:', error)
-      this.errors.push(
-        `Failed to play next paragraph: ${error instanceof Error ? error.message : 'Unknown error'}`
-      )
-      this.playingState = PlayingState.Stopped
-    }
+    await this.play()
   }
   public prev = async () => {
     this.direction = 'backward'
@@ -349,6 +304,12 @@ export class Player {
   public getPlayingState() {
     return this.playingState
   }
+  public setPlayingState(playingState: PlayingState) {
+    console.log('🎵 Playing state', playingState)
+    if (this.playingState === playingState) return
+    this.playingState = playingState
+    this.emit('playingStateChanged', playingState)
+  }
 
   public getErrors() {
     return this.errors
@@ -361,9 +322,16 @@ export class Player {
   private getPrefetchPriority() {
     return this.priority - 1
   }
-  private hasApiKey() {
-    return window.functions.getTTSApiKeyStatus()
+  private checkApiKey() {
+    window.functions.getTTSApiKeyStatus().then((hasApiKey) => {
+      this.hasApiKey = hasApiKey
+      if (!hasApiKey) {
+        this.errors.push('OpenAI API key not configured')
+        this.setPlayingState(PlayingState.Stopped)
+      }
+    })
   }
+
   private highlightParagraph(paragraph: ParagraphWithCFI) {
     this.rendition.highlightRange(paragraph.cfiRange)
   }
