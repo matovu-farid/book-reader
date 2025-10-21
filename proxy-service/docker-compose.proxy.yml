@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  openai-tts-proxy:
+    image: matovu90/openai-proxy
+    container_name: openai-tts-proxy
+    ports:
+      - '5458:5458'
+    environment:
+      - OPENAI_API_KEY_FILE=/run/secrets/openai_api_key
+      - NODE_ENV=production
+      - PORT=5458
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
+      - RATE_LIMIT_MAX=${RATE_LIMIT_MAX:-100}
+    secrets:
+      - openai_api_key
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'bun',
+          '-e',
+          "Bun.fetch('http://localhost:5458/health').then(r => process.exit(r.status === 200 ? 0 : 1))"
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - proxy-network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+
+secrets:
+  openai_api_key:
+    file: ./openai_api_key.txt
+
+networks:
+  proxy-network:
+    driver: bridge
+    name: openai-tts-proxy-network
+    external: true
