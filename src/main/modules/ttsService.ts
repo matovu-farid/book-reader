@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events'
 import { ttsCache } from './ttsCache'
 import { ttsQueue } from './ttsQueue'
+import { TTS_EVENTS, TTSQueueEvents } from '../ipc_handles'
 
 export interface AudioReadyEvent {
   bookId: string
@@ -37,15 +38,15 @@ export class TTSService extends EventEmitter {
     this.setMaxListeners(50) // Allow more concurrent requests
 
     // Forward audio-ready events from queue
-    ttsQueue.on('audio-ready', (event: AudioReadyEvent) => {
+    ttsQueue.on(TTSQueueEvents.AUDIO_READY, (event: AudioReadyEvent) => {
       this.activeRequests.delete(`${event.bookId}-${event.cfiRange}`)
-      this.emit('audio-ready', event)
+      this.emit(TTS_EVENTS.AUDIO_READY, event)
     })
 
     // Forward error events from queue
-    ttsQueue.on('error', (event: TTSErrorEvent) => {
+    ttsQueue.on(TTSQueueEvents.AUDIO_ERROR, (event: TTSErrorEvent) => {
       this.activeRequests.delete(`${event.bookId}-${event.cfiRange}`)
-      this.emit('error', event)
+      this.emit(TTS_EVENTS.ERROR, event)
     })
   }
 
@@ -94,8 +95,8 @@ export class TTSService extends EventEmitter {
             listeners: { onAudioReady, onError }
           })
 
-          this.on('audio-ready', onAudioReady)
-          this.on('error', onError)
+          this.on(TTS_EVENTS.AUDIO_READY, onAudioReady)
+          this.on(TTS_EVENTS.ERROR, onError)
         })
       }
 
@@ -181,7 +182,7 @@ export class TTSService extends EventEmitter {
   /**
    * Get book cache size
    */
-  async getBookCacheSize(bookId: string): Promise<number> {
+  getBookCacheSize(bookId: string): Promise<number> {
     return ttsCache.getBookCacheSize(bookId)
   }
 
@@ -206,8 +207,8 @@ export class TTSService extends EventEmitter {
     const pendingListener = this.pendingListeners.get(requestId)
     if (pendingListener) {
       clearTimeout(pendingListener.timeout)
-      this.removeListener('audio-ready', pendingListener.listeners.onAudioReady)
-      this.removeListener('error', pendingListener.listeners.onError)
+      this.removeListener(TTS_EVENTS.AUDIO_READY, pendingListener.listeners.onAudioReady)
+      this.removeListener(TTS_EVENTS.ERROR, pendingListener.listeners.onError)
       this.pendingListeners.delete(requestId)
     }
   }

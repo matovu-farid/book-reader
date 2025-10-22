@@ -3,12 +3,7 @@ import { EventEmitter } from 'events'
 import PriorityQueue from 'priorityqueuejs'
 import type { TTSRequest } from '../../shared/types'
 import { ttsCache } from './ttsCache'
-
-export enum TTSQueueEvents {
-  REQUEST_AUDIO = 'request-audio',
-  AUDIO_READY = 'audio-ready',
-  AUDIO_ERROR = 'audio-error'
-}
+import { TTSQueueEvents } from '../ipc_handles'
 
 export interface QueueItem extends TTSRequest {
   priority: number
@@ -79,7 +74,7 @@ export class TTSQueue extends EventEmitter {
   /**
    * Add a TTS request to the queue (cache check should be done by caller)
    */
-  async requestAudio(
+  requestAudio(
     bookId: string,
     cfiRange: string,
     text: string,
@@ -150,7 +145,7 @@ export class TTSQueue extends EventEmitter {
 
       // Start processing if not already running
       if (!this.isProcessing) {
-        this.processQueue()
+        void this.processQueue()
       }
     })
   }
@@ -217,7 +212,7 @@ export class TTSQueue extends EventEmitter {
               this.pendingRequests.set(item.requestId, item)
               this.pendingTimeouts.delete(timeout)
               if (!this.isProcessing) {
-                this.processQueue()
+                void this.processQueue()
               }
             },
             this.RETRY_DELAY_MS * Math.pow(2, item.retryCount - 1)

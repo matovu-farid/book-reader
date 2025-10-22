@@ -12,10 +12,11 @@ import {
   REACT_DEVELOPER_TOOLS
 } from 'electron-devtools-installer'
 import config from './config.json'
+import { IPC_HANDLERS, TTS_EVENTS } from './ipc_handles'
 
 let mainWindow: BrowserWindow | null = null
 
-function createWindow(): void {
+async function createWindow(): Promise<void> {
   // Create the browser window.
   mainWindow = new BrowserWindow({
     width: 1024,
@@ -36,7 +37,7 @@ function createWindow(): void {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    void shell.openExternal(details.url)
     return { action: 'deny' }
   })
 
@@ -46,14 +47,14 @@ function createWindow(): void {
   // HMR for renderer base on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    await mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    await mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
 
 function iPCHandlers(): void {
-  ipcMain.handle('files:choose', async () => {
+  ipcMain.handle(IPC_HANDLERS.FILES_CHOOSE, async () => {
     if (!mainWindow) return []
 
     const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
@@ -68,16 +69,17 @@ function iPCHandlers(): void {
     return filePaths // Returns real absolute paths
   })
 
-  ipcMain.handle('getCoverImage', (_, filePath) => getCoverImage(filePath))
-  ipcMain.handle('getBooks', () => getBooks())
-  ipcMain.handle('updateCurrentBookId', (_, bookFolder: string, currentBookId: string) =>
-    updateCurrentBookId(bookFolder, currentBookId)
+  ipcMain.handle(IPC_HANDLERS.GET_COVER_IMAGE, (_, filePath) => getCoverImage(filePath))
+  ipcMain.handle(IPC_HANDLERS.GET_BOOKS, () => getBooks())
+  ipcMain.handle(
+    IPC_HANDLERS.UPDATE_CURRENT_BOOK_ID,
+    (_, bookFolder: string, currentBookId: string) => updateCurrentBookId(bookFolder, currentBookId)
   )
-  ipcMain.handle('deleteBook', (_, bookFolder: string) => deleteBook(bookFolder))
+  ipcMain.handle(IPC_HANDLERS.DELETE_BOOK, (_, bookFolder: string) => deleteBook(bookFolder))
 
   // TTS handlers
   ipcMain.handle(
-    'tts:request-audio',
+    IPC_HANDLERS.TTS_REQUEST_AUDIO,
     async (_, bookId: string, cfiRange: string, text: string, priority = 0) => {
       try {
         return await ttsService.requestAudio(bookId, cfiRange, text, priority)
@@ -88,7 +90,7 @@ function iPCHandlers(): void {
     }
   )
 
-  ipcMain.handle('tts:get-audio-path', async (_, bookId: string, cfiRange: string) => {
+  ipcMain.handle(IPC_HANDLERS.TTS_GET_AUDIO_PATH, async (_, bookId: string, cfiRange: string) => {
     try {
       return await ttsService.getAudioPath(bookId, cfiRange)
     } catch (error) {
@@ -97,7 +99,7 @@ function iPCHandlers(): void {
     }
   })
 
-  ipcMain.handle('tts:get-api-key-status', () => {
+  ipcMain.handle(IPC_HANDLERS.TTS_GET_API_KEY_STATUS , () => {
     try {
       return ttsService.hasApiKey()
     } catch (error) {
@@ -105,14 +107,14 @@ function iPCHandlers(): void {
       return false
     }
   })
-  ipcMain.handle('tts:should-debug', (): boolean => {
+  ipcMain.handle(IPC_HANDLERS.TTS_SHOULD_DEBUG, (): boolean => {
     if (process.env.NODE_ENV === 'development') {
       return config.development.player.recordPlayingState
     }
     return config.production.player.recordPlayingState
   })
 
-  ipcMain.handle('tts:get-queue-status', () => {
+  ipcMain.handle(IPC_HANDLERS.TTS_GET_QUEUE_STATUS, () => {
     try {
       return ttsService.getQueueStatus()
     } catch (error) {
@@ -121,7 +123,7 @@ function iPCHandlers(): void {
     }
   })
 
-  ipcMain.handle('tts:clear-book-cache', async (_, bookId: string) => {
+  ipcMain.handle(IPC_HANDLERS.TTS_CLEAR_BOOK_CACHE, async (_, bookId: string) => {
     try {
       await ttsService.clearBookCache(bookId)
     } catch (error) {
@@ -130,7 +132,7 @@ function iPCHandlers(): void {
     }
   })
 
-  ipcMain.handle('tts:get-book-cache-size', async (_, bookId: string) => {
+  ipcMain.handle(IPC_HANDLERS.TTS_GET_BOOK_CACHE_SIZE, async (_, bookId: string) => {
     try {
       return await ttsService.getBookCacheSize(bookId)
     } catch (error) {
@@ -140,20 +142,20 @@ function iPCHandlers(): void {
   })
 
   // Forward TTS events to renderer
-  ttsService.on('audio-ready', (event) => {
-    mainWindow?.webContents.send('tts:audio-ready', event)
+  ttsService.on(TTS_EVENTS.AUDIO_READY, (event) => {
+    mainWindow?.webContents.send(IPC_HANDLERS.TTS_AUDIO_READY, event)
   })
 
   // Forward TTS error events to renderer
-  ttsService.on('error', (event) => {
-    mainWindow?.webContents.send('tts:error', event)
+  ttsService.on(TTS_EVENTS.ERROR, (event) => {
+    mainWindow?.webContents.send(IPC_HANDLERS.TTS_ERROR, event)
   })
 }
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
-  installExtension([REDUX_DEVTOOLS, REACT_DEVELOPER_TOOLS]).then(() => {
+void app.whenReady().then(() => {
+  void installExtension([REDUX_DEVTOOLS, REACT_DEVELOPER_TOOLS]).then(() => {
     // Set app user model id for windows
     electronApp.setAppUserModelId('com.electron')
 
@@ -165,12 +167,12 @@ app.whenReady().then(() => {
     })
     iPCHandlers()
 
-    createWindow()
+    void createWindow()
 
-    app.on('activate', function () {
+    app.on('activate', async function () {
       // On macOS it's common to re-create a window in the app when the
       // dock icon is clicked and there are no other windows open.
-      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+      if (BrowserWindow.getAllWindows().length === 0) await createWindow()
     })
   })
 })
