@@ -8,6 +8,10 @@ export enum PlayingState {
   Stopped = 'stopped',
   Loading = 'loading'
 }
+export enum Direction {
+  Forward = 'forward',
+  Backward = 'backward'
+}
 export enum PlayerEvent {
   PARAGRAPH_INDEX_CHANGED = 'paragraphIndexChanged',
   PLAYING_STATE_CHANGED = 'playingStateChanged',
@@ -39,7 +43,7 @@ export class Player extends EventEmitter<PlayerEventMap> {
   private priority: number
   private errors: string[] = []
   private audioElement: HTMLAudioElement = new Audio()
-
+  private direction: Direction = Direction.Forward
   private nextPageParagraphs: ParagraphWithCFI[]
   private previousPageParagraphs: ParagraphWithCFI[]
   private hasApiKey: boolean
@@ -83,7 +87,8 @@ export class Player extends EventEmitter<PlayerEventMap> {
   }
   private resetParagraphs() {
     this.paragraphs = this.rendition.getCurrentViewParagraphs() || []
-    this.setParagraphIndex(0)
+    if (this.direction === Direction.Backward) this.setParagraphIndex(this.paragraphs.length - 1)
+    else this.setParagraphIndex(0)
     return Promise.all([
       this.rendition.getNextViewParagraphs().then((nextPageParagraphs) => {
         this.nextPageParagraphs = nextPageParagraphs || []
@@ -289,25 +294,10 @@ export class Player extends EventEmitter<PlayerEventMap> {
     }
   }
   private moveToNextPage = async () => {
-    const temp = this.paragraphs
     await this.rendition.next()
-    this.setParagraphIndex(0)
-    this.paragraphs = this.nextPageParagraphs
-    this.cleanup()
-    this.nextPageParagraphs = (await this.rendition.getNextViewParagraphs()) || []
-    this.previousPageParagraphs = temp
   }
   private moveToPreviousPage = async () => {
-    const temp = this.paragraphs
     await this.rendition.prev()
-    this.paragraphs = this.previousPageParagraphs
-    if (this.playingState === PlayingState.Playing) {
-      this.setParagraphIndex(this.paragraphs.length - 1)
-    }
-
-    this.cleanup()
-    this.previousPageParagraphs = (await this.rendition.getPreviousViewParagraphs()) || []
-    this.nextPageParagraphs = temp
   }
   private updateParagaph = async (index: number) => {
     // bounds checks
@@ -337,10 +327,12 @@ export class Player extends EventEmitter<PlayerEventMap> {
     await this.play()
   }
   public prev = async () => {
+    this.direction = Direction.Backward
     const prevIndex = this.currentParagraphIndex - 1
     await this.updateParagaph(prevIndex)
   }
   public next = async () => {
+    this.direction = Direction.Forward
     const nextIndex = this.currentParagraphIndex + 1
 
     await this.updateParagaph(nextIndex)
