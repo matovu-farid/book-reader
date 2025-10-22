@@ -24,6 +24,7 @@ interface TTSControlsProps {
 export function TTSControls({ bookId, rendition, disabled = false }: TTSControlsProps) {
   const [showError, setShowError] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
+  const [hasShownError, setHasShownError] = useState(false)
 
   const error = errors.join('\n')
   const [player] = useState<Player>(new Player(rendition, bookId))
@@ -32,7 +33,25 @@ export function TTSControls({ bookId, rendition, disabled = false }: TTSControls
 
   useEffect(() => {
     player.on('playingStateChanged', setPlayingState)
-  }, [])
+  }, [player])
+
+  // Check for errors using setTimeout to avoid cascading renders
+  useEffect(() => {
+    const checkForErrors = () => {
+      const currentErrors = player.getErrors()
+      if (currentErrors.length !== 0 && !hasShownError) {
+        setShowError(true)
+        setErrors(currentErrors)
+        setHasShownError(true)
+      } else if (currentErrors.length === 0 && hasShownError) {
+        setHasShownError(false)
+      }
+    }
+
+    // Use setTimeout to defer the state update
+    const timeoutId = setTimeout(checkForErrors, 0)
+    return () => clearTimeout(timeoutId)
+  }, [player, hasShownError])
 
   // Show error snackbar when error occurs
   const handleErrorClose = () => {
@@ -41,10 +60,6 @@ export function TTSControls({ bookId, rendition, disabled = false }: TTSControls
     if (player) {
       player.cleanup()
     }
-  }
-  if (player.getErrors().length !== 0) {
-    setShowError(true)
-    setErrors(player.getErrors())
   }
 
   const handlePlay = () => {

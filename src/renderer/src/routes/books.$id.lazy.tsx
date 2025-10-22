@@ -5,7 +5,7 @@ import { ReactReader } from '@renderer/components/react-reader'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-toastify'
 import { Book } from 'src/shared/types'
-import { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, useMemo } from 'react'
 import { Button, FormControlLabel, IconButton, Radio, RadioGroup } from '@mui/material'
 import type { Rendition } from '@epubjs'
 import Menu from '@mui/material/Menu'
@@ -28,8 +28,8 @@ function updateTheme(rendition: Rendition, theme: ThemeType) {
   reditionThemes.override('font-size', '1.2em')
 }
 
-function BookView(): JSX.Element {
-  const { id } = Route.useParams()
+function BookView(): React.JSX.Element {
+  const { id } = Route.useParams() as { id: string }
   const rendition = useRef<Rendition | undefined>(undefined)
   const [renditionState, setRenditionState] = useState<Rendition | null>()
   const [theme, setTheme] = useState<ThemeType>(ThemeType.White)
@@ -54,26 +54,30 @@ function BookView(): JSX.Element {
       return book
     }
   })
-  const materialTheme = createTheme({
-    palette: {
-      primary: {
-        main: themes[theme].color,
-        contrastText: themes[theme].background
-      }
-    },
-    components: {
-      MuiMenu: {
-        styleOverrides: {
-          list: {
-            '&[role="menu"]': {
-              backgroundColor: themes[theme].background,
-              color: themes[theme].color
+  const materialTheme = useMemo(
+    () =>
+      createTheme({
+        palette: {
+          primary: {
+            main: themes[theme].color,
+            contrastText: themes[theme].background
+          }
+        },
+        components: {
+          MuiMenu: {
+            styleOverrides: {
+              list: {
+                '&[role="menu"]': {
+                  backgroundColor: themes[theme].background,
+                  color: themes[theme].color
+                }
+              }
             }
           }
         }
-      }
-    }
-  })
+      }),
+    [theme]
+  )
   const queryClient = useQueryClient()
   const updateBookId = useMutation({
     mutationFn: async ({ book, newId }: { book: Book; newId: string }) => {
@@ -93,10 +97,10 @@ function BookView(): JSX.Element {
   // Update rendition state when ref becomes available
   useEffect(() => {
     rendition.current?.on('rendered', () => {
-      if (rendition.current == renditionState) return
+      if (rendition.current === renditionState) return
       setRenditionState(rendition.current)
     })
-  }, [])
+  }, [renditionState])
 
   if (isError) return <div className="w-full h-full place-items-center grid"> {error.message}</div>
   if (isPending)
