@@ -51,16 +51,19 @@ export class Player extends EventEmitter<PlayerEventMap> {
 
     this.bookId = bookId
     this.hasApiKey = false
-    this.checkApiKey()
+    void this.checkApiKey()
     // this.paragraphs = rendition.getCurrentViewParagraphs() || []
-    rendition.on('rendered', () => {
+    rendition.on(EVENTS.RENDITION.RENDERED, () => {
       this.paragraphs = rendition.getCurrentViewParagraphs() || []
-      rendition.getNextViewParagraphs().then((nextPageParagraphs) => {
+
+      void rendition.getNextViewParagraphs().then((nextPageParagraphs) => {
         this.nextPageParagraphs = nextPageParagraphs || []
       })
-      rendition.getPreviousViewParagraphs().then((previousPageParagraphs) => {
+      void rendition.getPreviousViewParagraphs().then((previousPageParagraphs) => {
         this.previousPageParagraphs = previousPageParagraphs?.reverse() || []
       })
+    })
+    this.rendition.once(EVENTS.RENDITION.RENDERED, () => {
       this.audioElement = new Audio()
       this.audioElement.addEventListener('ended', this.handleEnded)
       this.audioElement.addEventListener('error', this.handleError)
@@ -73,39 +76,54 @@ export class Player extends EventEmitter<PlayerEventMap> {
     this.nextPageParagraphs = []
     this.previousPageParagraphs = []
   }
-
-  private handleLocationChanged = () => {
-    this.stop()
-    this.unhighlightParagraph(this.getCurrentParagraph())
-    this.paragraphs = this.rendition.getCurrentViewParagraphs() || []
-    this.setParagraphIndex(0)
-    this.rendition.getNextViewParagraphs().then((nextPageParagraphs) => {
-      this.nextPageParagraphs = nextPageParagraphs || []
-    })
-    this.rendition.getPreviousViewParagraphs().then((previousPageParagraphs) => {
-      this.previousPageParagraphs = previousPageParagraphs?.reverse() || []
-    })
-    if (this.playingState === PlayingState.Playing) {
-      this.play()
+  private async clearHighlights() {
+    for (const paragraph of this.paragraphs) {
+      await this.unhighlightParagraph(paragraph)
     }
   }
+  private resetParagraphs() {
+    this.paragraphs = this.rendition.getCurrentViewParagraphs() || []
+    this.setParagraphIndex(0)
+    return Promise.all([
+      this.rendition.getNextViewParagraphs().then((nextPageParagraphs) => {
+        this.nextPageParagraphs = nextPageParagraphs || []
+      }),
+      this.rendition.getPreviousViewParagraphs().then((previousPageParagraphs) => {
+        this.previousPageParagraphs = previousPageParagraphs?.reverse() || []
+      })
+    ])
+  }
+
+  private handleLocationChanged = async () => {
+    await this.clearHighlights()
+    console.log('🎵 Location changed, playing state:', this.playingState)
+    if (this.playingState === PlayingState.Playing) {
+      await this.stop()
+      await this.resetParagraphs()
+      await this.play()
+    } else {
+      await this.stop()
+      await this.resetParagraphs()
+    }
+  }
+
   public cleanup() {
     this.audioElement.removeEventListener('ended', this.handleEnded)
     this.audioElement.removeEventListener('error', this.handleError)
     this.audioElement.pause()
     this.audioElement.src = ''
   }
-  private handleEnded = () => {
+  private handleEnded = async () => {
     try {
       const currentParagraph = this.getCurrentParagraph()
       if (!currentParagraph) return
-      this.rendition.removeHighlight(currentParagraph.cfiRange)
+      await this.rendition.removeHighlight(currentParagraph.cfiRange)
     } catch (error) {
       console.warn('Failed to remove highlight:', error)
     }
 
     // advanceToNextParagraphRef.current?.() // Use ref to avoid stale closure
-    this.next()
+    await this.next()
   }
   private handleError = (e: ErrorEvent) => {
     console.error('Audio error:', e)
@@ -151,7 +169,7 @@ export class Player extends EventEmitter<PlayerEventMap> {
     }
     // Highlight current paragraph and store reference
 
-    this.highlightParagraph(currentParagraph)
+    await this.highlightParagraph(currentParagraph)
 
     // Request audio with high priority
 
@@ -192,10 +210,10 @@ export class Player extends EventEmitter<PlayerEventMap> {
 
       // Prefetch next paragraphs
 
-      this.prefetchAudio(this.currentParagraphIndex + 1, 3)
-      this.prefetchAudio(this.currentParagraphIndex - 3, 3)
+      void this.prefetchAudio(this.currentParagraphIndex + 1, 3)
+      void this.prefetchAudio(this.currentParagraphIndex - 3, 3)
     } catch (error) {
-      console.error('🎵 Playback failed:', error)
+      console.log('🎵 Playback failed:', error)
       this.errors.push(
         `Playback failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       )
@@ -209,7 +227,7 @@ export class Player extends EventEmitter<PlayerEventMap> {
     this.setPlayingState(PlayingState.Paused)
   }
   public resume() {
-    if (!this.audioElement.paused) return
+    if (this.playingState !== PlayingState.Paused) return
     this.audioElement.play().catch((error) => {
       console.error('Failed to resume audio:', error)
       this.errors.push(`Failed to resume audio: ${error.message}`)
@@ -231,7 +249,7 @@ export class Player extends EventEmitter<PlayerEventMap> {
     })
   }
   public async stop() {
-    if (this.playingState !== PlayingState.Playing) return
+    if (this.playingState === PlayingState.Stopped) return
     this.audioElement.pause()
     this.audioElement.currentTime = 0
     this.setParagraphIndex(0)
@@ -244,18 +262,21 @@ export class Player extends EventEmitter<PlayerEventMap> {
 
     this.audioElement.load()
 
-    this.rendition.removeHighlight(currentParagraph.cfiRange)
-
+    await this.clearHighlights()
     this.setPlayingState(PlayingState.Stopped)
   }
   private prefetchNextPageAudio = (count: number = 3) => {
     if (this.nextPageParagraphs.length === 0) return
+    const promises: Promise<unknown>[] = []
     for (let i = 0; i < Math.min(count, this.nextPageParagraphs.length); i++) {
       const paragraph = this.nextPageParagraphs[i]
-      this.requestAudio(paragraph, this.getPrefetchPriority()).catch((error) => {
+
+      const promise = this.requestAudio(paragraph, this.getPrefetchPriority()).catch((error) => {
         console.warn(`Prefetch failed for next page paragraph ${i}:`, error)
       })
+      promises.push(promise)
     }
+    return Promise.all(promises)
   }
   private prefetchPrevPageAudio = (count: number = 3) => {
     if (this.previousPageParagraphs.length === 0) return
@@ -291,17 +312,15 @@ export class Player extends EventEmitter<PlayerEventMap> {
   private updateParagaph = async (index: number) => {
     // bounds checks
     if (index < 0) {
-      this.moveToPreviousPage()
-      return
+      return this.moveToPreviousPage()
     }
     if (index >= this.paragraphs.length) {
-      this.moveToNextPage()
-      return
+      return this.moveToNextPage()
     }
     if (index == this.paragraphs.length - 1) {
       // Request audio for the next paragraphs of the next page
       if (this.playingState === PlayingState.Playing) {
-        this.prefetchNextPageAudio(3)
+        void this.prefetchNextPageAudio(3)
       }
     }
     if (index == 0) {
@@ -319,12 +338,12 @@ export class Player extends EventEmitter<PlayerEventMap> {
   }
   public prev = async () => {
     const prevIndex = this.currentParagraphIndex - 1
-    this.updateParagaph(prevIndex)
+    await this.updateParagaph(prevIndex)
   }
   public next = async () => {
     const nextIndex = this.currentParagraphIndex + 1
 
-    this.updateParagaph(nextIndex)
+    await this.updateParagaph(nextIndex)
   }
 
   public getPlayingState() {
@@ -349,23 +368,24 @@ export class Player extends EventEmitter<PlayerEventMap> {
     return this.priority - 1
   }
   private checkApiKey() {
-    window.functions.getTTSApiKeyStatus().then((hasApiKey) => {
+    return window.functions.getTTSApiKeyStatus().then((hasApiKey) => {
       this.hasApiKey = hasApiKey
       if (!hasApiKey) {
         this.errors.push('OpenAI API key not configured')
         this.setPlayingState(PlayingState.Stopped)
       }
+      return hasApiKey
     })
   }
 
   private highlightParagraph(paragraph: ParagraphWithCFI) {
-    this.rendition.highlightRange(paragraph.cfiRange)
+    return this.rendition.highlightRange(paragraph.cfiRange)
   }
-  private unhighlightParagraph(paragraph: ParagraphWithCFI) {
-    this.rendition.removeHighlight(paragraph.cfiRange)
+  private async unhighlightParagraph(paragraph: ParagraphWithCFI) {
+    return await this.rendition.removeHighlight(paragraph.cfiRange)
   }
   private async requestAudio(paragraph: ParagraphWithCFI, priority: number) {
-    if (!paragraph.text.trim()) return
+    if (!paragraph.text.trim()) return null
 
     // Check Zustand cache first
     const cached = this.audioCache.get(paragraph.cfiRange)
@@ -405,7 +425,7 @@ export class Player extends EventEmitter<PlayerEventMap> {
       const index = startIndex + i
       if (index < this.paragraphs.length && index >= 0) {
         const paragraph = this.paragraphs[index]
-        this.requestAudio(paragraph, this.priority - 1).catch((error) => {
+        await this.requestAudio(paragraph, this.priority - 1).catch((error) => {
           console.warn(`Prefetch failed for paragraph ${index}:`, error)
         }) // Fix: Add error logging for prefetch failures
       }
