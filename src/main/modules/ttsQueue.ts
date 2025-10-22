@@ -156,6 +156,7 @@ export class TTSQueue extends EventEmitter {
       this.activeRequests.set(item.requestId, item)
 
       try {
+        // TODO: Check if this can be optimized as a stream
         const audioBuffer = await this.generateAudio(item)
 
         // Save directly to cache
