@@ -85,9 +85,11 @@ const openaiProxyOptions = {
   ) => {
     console.log(`OpenAI responded with status: ${proxyRes.statusCode}`)
 
-    // Add CORS headers to response
-    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*')
-    res.setHeader('Access-Control-Allow-Credentials', 'true')
+    // Add CORS headers to response only for non-streaming responses
+    if (proxyRes.headers['content-type'] !== 'audio/mpeg') {
+      res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*')
+      res.setHeader('Access-Control-Allow-Credentials', 'true')
+    }
   },
   onError: (err: Error, req: Request, res: Response) => {
     console.error('Proxy error:', err)
