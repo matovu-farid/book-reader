@@ -8,15 +8,36 @@ export enum PlayingState {
   Stopped = 'stopped',
   Loading = 'loading'
 }
-export class Player extends EventEmitter {
+export enum PlayerEvent {
+  PARAGRAPH_INDEX_CHANGED = 'paragraphIndexChanged',
+  PLAYING_STATE_CHANGED = 'playingStateChanged',
+  ERRORS_CHANGED = 'errorsChanged'
+}
+export type PlayerEventMap = {
+  [PlayerEvent.PARAGRAPH_INDEX_CHANGED]: [ParagraphIndexChangedEvent]
+  [PlayerEvent.PLAYING_STATE_CHANGED]: [PlayingState]
+  [PlayerEvent.ERRORS_CHANGED]: [ErrorsChangedEvent]
+}
+
+export interface ParagraphIndexChangedEvent {
+  index: number
+  paragraph: ParagraphWithCFI | null
+}
+export type PlayingStateChangedEvent = [PlayingState]
+
+export interface ErrorsChangedEvent {
+  errors: string[]
+}
+
+export class Player extends EventEmitter<PlayerEventMap> {
   private rendition: Rendition
   private playingState: PlayingState = PlayingState.Stopped
-  private currentParagraphIndex: number
+  private currentParagraphIndex: number = 0
   private paragraphs: ParagraphWithCFI[] = []
   private bookId: string
   private audioCache: Map<string, string>
   private priority: number
-  private errors: string[]
+  private errors: string[] = []
   private audioElement: HTMLAudioElement = new Audio()
 
   private nextPageParagraphs: ParagraphWithCFI[]
@@ -26,7 +47,8 @@ export class Player extends EventEmitter {
     super()
     this.rendition = rendition
     this.setPlayingState(PlayingState.Stopped)
-    this.currentParagraphIndex = 0
+    this.setParagraphIndex(0)
+
     this.bookId = bookId
     this.hasApiKey = false
     this.checkApiKey()
@@ -53,18 +75,19 @@ export class Player extends EventEmitter {
   }
 
   private handleLocationChanged = () => {
-    if (this.playingState !== PlayingState.Playing) return
     this.stop()
+    this.unhighlightParagraph(this.getCurrentParagraph())
     this.paragraphs = this.rendition.getCurrentViewParagraphs() || []
-    this.currentParagraphIndex = 0
+    this.setParagraphIndex(0)
     this.rendition.getNextViewParagraphs().then((nextPageParagraphs) => {
       this.nextPageParagraphs = nextPageParagraphs || []
     })
     this.rendition.getPreviousViewParagraphs().then((previousPageParagraphs) => {
       this.previousPageParagraphs = previousPageParagraphs?.reverse() || []
     })
-
-    this.play()
+    if (this.playingState === PlayingState.Playing) {
+      this.play()
+    }
   }
   public cleanup() {
     this.audioElement.removeEventListener('ended', this.handleEnded)
@@ -91,9 +114,11 @@ export class Player extends EventEmitter {
     this.setPlayingState(PlayingState.Stopped)
   }
   private getCurrentParagraph() {
-    if (this.currentParagraphIndex >= this.paragraphs.length || this.currentParagraphIndex < 0) {
-      this.errors.push('No paragraphs available to play')
-      return null
+    if (this.currentParagraphIndex < 0) {
+      this.currentParagraphIndex = 0
+    }
+    if (this.currentParagraphIndex >= this.paragraphs.length) {
+      this.currentParagraphIndex = this.paragraphs.length - 1
     }
     return this.paragraphs[this.currentParagraphIndex]
   }
@@ -103,6 +128,7 @@ export class Player extends EventEmitter {
   }
 
   public async play() {
+    if (this.playingState === PlayingState.Playing) return
     this.setPlayingState(PlayingState.Playing)
 
     if (!this.hasApiKey) {
@@ -116,20 +142,13 @@ export class Player extends EventEmitter {
       this.errors.push('No paragraphs available to play')
       return
     }
-    // check if the current paragraph index is valid
-    if (this.currentParagraphIndex >= this.paragraphs.length || this.currentParagraphIndex < 0) {
-      console.error(
-        '🎵 Invalid paragraph index:',
-        this.currentParagraphIndex,
-        'out of',
-        this.paragraphs.length
-      )
-      this.errors.push('No paragraphs available to play')
+
+    const currentParagraph = this.getCurrentParagraph()
+    if (!currentParagraph) {
+      console.error('🎵 No current paragraph available')
+      this.errors.push('No current paragraph available to play')
       return
     }
-
-    const currentParagraph = this.paragraphs[this.currentParagraphIndex]
-
     // Highlight current paragraph and store reference
 
     this.highlightParagraph(currentParagraph)
@@ -198,12 +217,32 @@ export class Player extends EventEmitter {
     this.setPlayingState(PlayingState.Playing)
   }
 
-  public stop() {
+  public setParagraphIndex(index: number) {
+    if (index < 0) {
+      index = 0
+    }
+    if (index >= this.paragraphs.length) {
+      index = this.paragraphs.length - 1
+    }
+    this.currentParagraphIndex = index
+    this.emit(PlayerEvent.PARAGRAPH_INDEX_CHANGED, {
+      index,
+      paragraph: this.getCurrentParagraph()
+    })
+  }
+  public async stop() {
+    if (this.playingState !== PlayingState.Playing) return
     this.audioElement.pause()
     this.audioElement.currentTime = 0
+    this.setParagraphIndex(0)
 
     const currentParagraph = this.getCurrentParagraph()
     if (!currentParagraph) return
+    const audioPath = await this.requestAudio(currentParagraph, this.getNextPriority())
+    // set the souce to the first paragraph
+    this.audioElement.src = audioPath || ''
+
+    this.audioElement.load()
 
     this.rendition.removeHighlight(currentParagraph.cfiRange)
 
@@ -231,7 +270,7 @@ export class Player extends EventEmitter {
   private moveToNextPage = async () => {
     const temp = this.paragraphs
     await this.rendition.next()
-    this.currentParagraphIndex = 0
+    this.setParagraphIndex(0)
     this.paragraphs = this.nextPageParagraphs
     this.cleanup()
     this.nextPageParagraphs = (await this.rendition.getNextViewParagraphs()) || []
@@ -242,7 +281,7 @@ export class Player extends EventEmitter {
     await this.rendition.prev()
     this.paragraphs = this.previousPageParagraphs
     if (this.playingState === PlayingState.Playing) {
-      this.currentParagraphIndex = this.paragraphs.length - 1
+      this.setParagraphIndex(this.paragraphs.length - 1)
     }
 
     this.cleanup()
@@ -272,14 +311,10 @@ export class Player extends EventEmitter {
       }
     }
     // first remove the current paragraph highlight and pause audio
-    let currentParagraph = this.getCurrentParagraph()
-    if (currentParagraph) {
-      this.unhighlightParagraph(currentParagraph)
-    }
+    await this.stop()
 
-    this.currentParagraphIndex = index
-    currentParagraph = this.getCurrentParagraph()
-    if (!currentParagraph) return
+    this.setParagraphIndex(index)
+
     await this.play()
   }
   public prev = async () => {
@@ -299,7 +334,7 @@ export class Player extends EventEmitter {
     console.log('🎵 Playing state', playingState)
     if (this.playingState === playingState) return
     this.playingState = playingState
-    this.emit('playingStateChanged', playingState)
+    this.emit(PlayerEvent.PLAYING_STATE_CHANGED, playingState)
   }
 
   public getErrors() {

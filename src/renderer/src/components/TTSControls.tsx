@@ -12,7 +12,7 @@ import {
 } from '@mui/icons-material'
 import { useEffect, useState } from 'react'
 import { PlayingState } from '@renderer/stores/ttsStore'
-import { Player } from '@renderer/models/Player'
+import { Player, PlayerEvent } from '@renderer/models/Player'
 import type { Rendition } from '@epubjs'
 import { useDebug } from '@renderer/hooks/useDebug'
 interface TTSControlsProps {
@@ -32,7 +32,7 @@ export function TTSControls({ bookId, rendition, disabled = false }: TTSControls
   const { setIsDebugging, shouldDebug } = useDebug(player)
 
   useEffect(() => {
-    player.on('playingStateChanged', setPlayingState)
+    player.on(PlayerEvent.PLAYING_STATE_CHANGED, setPlayingState)
   }, [player])
 
   // Check for errors using setTimeout to avoid cascading renders
