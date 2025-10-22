@@ -4,6 +4,12 @@ import PriorityQueue from 'priorityqueuejs'
 import type { TTSRequest } from '../../shared/types'
 import { ttsCache } from './ttsCache'
 
+export enum TTSQueueEvents {
+  REQUEST_AUDIO = 'request-audio',
+  AUDIO_READY = 'audio-ready',
+  AUDIO_ERROR = 'audio-error'
+}
+
 export interface QueueItem extends TTSRequest {
   priority: number
   resolve: (audioPath: string) => void
@@ -11,11 +17,6 @@ export interface QueueItem extends TTSRequest {
   requestId: string
   timestamp: number
   retryCount: number
-}
-
-interface DuplicateRequest {
-  resolve: (audioPath: string) => void
-  reject: (error: Error) => void
 }
 
 /**
@@ -28,8 +29,7 @@ export class TTSQueue extends EventEmitter {
   private openai: OpenAI | null = null
   private apiKey: string | null = null
   private readonly activeRequests = new Map<string, QueueItem>()
-  private readonly requestDeduplication = new Map<string, QueueItem>()
-  private readonly duplicateRequests = new Map<string, DuplicateRequest[]>()
+  private readonly pendingRequests = new Map<string, QueueItem>()
   private readonly pendingTimeouts = new Set<NodeJS.Timeout>()
   private readonly MAX_RETRIES = 3
   private readonly RETRY_DELAY_MS = 1000
@@ -45,7 +45,7 @@ export class TTSQueue extends EventEmitter {
      */
     this.queue = new PriorityQueue((a: QueueItem, b: QueueItem) => b.priority - a.priority)
     this.initializeOpenAI()
-    this.on('request-audio', this.maintainQueueSize)
+    this.on(TTSQueueEvents.REQUEST_AUDIO, this.maintainQueueSize)
   }
 
   private maintainQueueSize(): void {
@@ -88,20 +88,44 @@ export class TTSQueue extends EventEmitter {
     if (!this.hasApiKey()) {
       throw new Error('OpenAI API key not configured')
     }
-    this.emit('request-audio', { bookId, cfiRange, text, priority })
+    this.emit(TTSQueueEvents.REQUEST_AUDIO, { bookId, cfiRange, text, priority })
 
     // Create unique request ID for deduplication
     const requestId = `${bookId}-${cfiRange}`
 
     // Check for duplicate request
-    if (this.requestDeduplication.has(requestId)) {
-      console.log(`Duplicate request detected, queuing duplicate: ${requestId}`)
+    if (this.pendingRequests.has(requestId)) {
+      console.log(`Duplicate request detected, listening for: ${requestId}`)
       return new Promise((resolve, reject) => {
-        // Store duplicate request callbacks
-        if (!this.duplicateRequests.has(requestId)) {
-          this.duplicateRequests.set(requestId, [])
+        // Listen for audio-ready events and filter by requestId
+        const handleAudioReady = (data: {
+          bookId: string
+          cfiRange: string
+          audioPath: string
+          requestId: string
+        }) => {
+          if (data.requestId === requestId) {
+            this.off(TTSQueueEvents.AUDIO_READY, handleAudioReady)
+            this.off(TTSQueueEvents.AUDIO_ERROR, handleAudioError)
+            resolve(data.audioPath)
+          }
         }
-        this.duplicateRequests.get(requestId)!.push({ resolve, reject })
+
+        const handleAudioError = (data: {
+          bookId: string
+          cfiRange: string
+          error: Error
+          requestId: string
+        }) => {
+          if (data.requestId === requestId) {
+            this.off(TTSQueueEvents.AUDIO_READY, handleAudioReady)
+            this.off(TTSQueueEvents.AUDIO_ERROR, handleAudioError)
+            reject(data.error)
+          }
+        }
+
+        this.on(TTSQueueEvents.AUDIO_READY, handleAudioReady)
+        this.on(TTSQueueEvents.AUDIO_ERROR, handleAudioError)
       })
     }
 
@@ -121,8 +145,8 @@ export class TTSQueue extends EventEmitter {
 
       // Add item to priority queue (automatically sorted by priority)
       this.queue.enq(queueItem)
-      // Store in deduplication map
-      this.requestDeduplication.set(requestId, queueItem)
+      // Store in pending requests map
+      this.pendingRequests.set(requestId, queueItem)
 
       // Start processing if not already running
       if (!this.isProcessing) {
@@ -147,7 +171,7 @@ export class TTSQueue extends EventEmitter {
       // Check if request is too old and should be cancelled
       if (Date.now() - item.timestamp > this.REQUEST_TIMEOUT_MS) {
         console.log(`Request timeout, cancelling: ${item.requestId}`)
-        this.requestDeduplication.delete(item.requestId)
+        this.pendingRequests.delete(item.requestId)
         item.reject(new Error('Request timeout'))
         continue
       }
@@ -163,27 +187,22 @@ export class TTSQueue extends EventEmitter {
         const audioPath = await ttsCache.saveCachedAudio(item.bookId, item.cfiRange, audioBuffer)
 
         // Clean up tracking
-        this.requestDeduplication.delete(item.requestId)
+        this.pendingRequests.delete(item.requestId)
         this.activeRequests.delete(item.requestId)
 
-        // Resolve the promise and emit event
+        // Resolve the promise and emit events
         item.resolve(audioPath)
 
-        // Resolve all duplicate requests
-        const duplicates = this.duplicateRequests.get(item.requestId) || []
-        duplicates.forEach(({ resolve: duplicateResolve }) => {
-          duplicateResolve(audioPath)
-        })
-        this.duplicateRequests.delete(item.requestId)
-
-        this.emit('audio-ready', {
+        // Emit audio-ready event with requestId for duplicate listeners
+        this.emit(TTSQueueEvents.AUDIO_READY, {
           bookId: item.bookId,
           cfiRange: item.cfiRange,
-          audioPath
+          audioPath,
+          requestId: item.requestId
         })
       } catch (error) {
         // Clean up tracking
-        this.requestDeduplication.delete(item.requestId)
+        this.pendingRequests.delete(item.requestId)
         this.activeRequests.delete(item.requestId)
 
         // Handle retry logic
@@ -195,7 +214,7 @@ export class TTSQueue extends EventEmitter {
           const timeout = setTimeout(
             () => {
               this.queue.enq(item)
-              this.requestDeduplication.set(item.requestId, item)
+              this.pendingRequests.set(item.requestId, item)
               this.pendingTimeouts.delete(timeout)
               if (!this.isProcessing) {
                 this.processQueue()
@@ -208,12 +227,13 @@ export class TTSQueue extends EventEmitter {
         } else {
           item.reject(error as Error)
 
-          // Reject all duplicate requests
-          const duplicates = this.duplicateRequests.get(item.requestId) || []
-          duplicates.forEach(({ reject: duplicateReject }) => {
-            duplicateReject(error as Error)
+          // Emit audio-error event with requestId for duplicate listeners
+          this.emit(TTSQueueEvents.AUDIO_ERROR, {
+            bookId: item.bookId,
+            cfiRange: item.cfiRange,
+            error: error as Error,
+            requestId: item.requestId
           })
-          this.duplicateRequests.delete(item.requestId)
 
           console.error('TTS generation failed:', error)
         }
@@ -256,24 +276,19 @@ export class TTSQueue extends EventEmitter {
     // Clear queue
     while (!this.queue.isEmpty()) {
       const item = this.queue.deq()
-      this.requestDeduplication.delete(item.requestId)
+      this.pendingRequests.delete(item.requestId)
       item.reject(new Error('Queue cleared'))
     }
 
     // Clear active requests
     for (const [requestId, item] of this.activeRequests) {
-      this.requestDeduplication.delete(requestId)
+      this.pendingRequests.delete(requestId)
       item.reject(new Error('Request cancelled'))
     }
     this.activeRequests.clear()
 
-    // Clear duplicate requests
-    for (const [, duplicates] of this.duplicateRequests) {
-      duplicates.forEach(({ reject }) => {
-        reject(new Error('Queue cleared'))
-      })
-    }
-    this.duplicateRequests.clear()
+    // Emit error events for any pending duplicate listeners
+    // (Event listeners will be automatically cleaned up by the event system)
 
     // Clear pending timeouts
     for (const timeout of this.pendingTimeouts) {
@@ -292,16 +307,23 @@ export class TTSQueue extends EventEmitter {
     if (this.activeRequests.has(requestId)) {
       const item = this.activeRequests.get(requestId)!
       this.activeRequests.delete(requestId)
-      this.requestDeduplication.delete(requestId)
+      this.pendingRequests.delete(requestId)
       item.reject(new Error('Request cancelled'))
       return true
     }
 
-    // Check deduplication map
-    if (this.requestDeduplication.has(requestId)) {
-      const item = this.requestDeduplication.get(requestId)!
-      this.requestDeduplication.delete(requestId)
+    // Check pending requests map
+    if (this.pendingRequests.has(requestId)) {
+      const item = this.pendingRequests.get(requestId)!
+      this.pendingRequests.delete(requestId)
       item.reject(new Error('Request cancelled'))
+      // Emit error event for any duplicate listeners
+      this.emit(TTSQueueEvents.AUDIO_ERROR, {
+        bookId: item.bookId,
+        cfiRange: item.cfiRange,
+        error: new Error('Request cancelled'),
+        requestId: requestId
+      })
       return true
     }
 
