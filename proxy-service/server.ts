@@ -1,19 +1,56 @@
 import express from 'express'
 import type { Request, Response } from 'express'
-import { createProxyMiddleware } from 'http-proxy-middleware'
 import cors from 'cors'
 import rateLimit from 'express-rate-limit'
 import helmet from 'helmet'
 import morgan from 'morgan'
 import { readFileSync } from 'fs'
+import axios, { AxiosError } from 'axios'
+import { Agent as HttpAgent, type AgentOptions } from 'node:http'
+import { Agent as HttpsAgent } from 'node:https'
 
 const app = express()
 const PORT = parseInt(process.env.PORT || '5458', 10)
 
 const OPENAI_API_KEY_FILE = process.env.OPENAI_API_KEY_FILE || '/run/secrets/openai_api_key'
+// At the top of the file, after imports
+let cachedApiKey: string | null = null
+
+// Initialize API key once at startup
+const initializeApiKey = () => {
+  try {
+    cachedApiKey = process.env.OPENAI_API_KEY || readFileSync(OPENAI_API_KEY_FILE, 'utf8').trim()
+    console.log('API key initialized successfully')
+  } catch (error) {
+    console.error('Failed to initialize API key:', error)
+    process.exit(1)
+  }
+}
+
+// Call at startup
+initializeApiKey()
+const agentOptions: AgentOptions = {
+  keepAlive: true,
+  maxSockets: 10,
+  keepAliveMsecs: 1 * 60 * 1000
+}
+const axiosInstance = axios.create({
+  baseURL: 'https://api.openai.com',
+  timeout: 120000, // 2 minutes for TTS generation
+  headers: {
+    Authorization: `Bearer ${cachedApiKey}`,
+    'Content-Type': 'application/json'
+  },
+
+  httpAgent: new HttpAgent(agentOptions),
+  httpsAgent: new HttpsAgent(agentOptions)
+})
 
 // Security middleware
 app.use(helmet())
+
+// JSON parsing middleware
+app.use(express.json())
 
 // CORS configuration
 app.use(
@@ -29,7 +66,7 @@ app.use(morgan('combined'))
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10), // limit each IP to 100 requests per windowMs
+  max: parseInt(process.env.RATE_LIMIT_MAX || '1000', 10), // limit each IP to 100 requests per windowMs
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false
@@ -45,63 +82,109 @@ app.get('/health', (req: Request, res: Response) => {
   })
 })
 
-// OpenAI TTS proxy configuration
-const openaiProxyOptions = {
-  target: 'https://api.openai.com',
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/openai': '' // remove /api/openai prefix when forwarding to OpenAI
-  },
-  onProxyReq: (
-    proxyReq: any, // eslint-disable-line @typescript-eslint/no-explicit-any
-    req: Request,
-    res: Response
-  ) => {
-    // Read OpenAI API key from Docker secret or environment
-    let apiKey = process.env.OPENAI_API_KEY
-    try {
-      if (!apiKey) {
-        // Try to read from Docker secret first
-        apiKey = readFileSync(OPENAI_API_KEY_FILE, 'utf8').trim()
-      }
-    } catch {
-      // Fallback to environment variable
-    }
-
-    if (!apiKey) {
-      console.error('OpenAI API key not found in secrets or environment')
-      return res.status(500).json({ error: 'OpenAI API key not configured' })
-    }
-
-    proxyReq.setHeader('Authorization', `Bearer ${apiKey}`)
-    proxyReq.setHeader('Content-Type', 'application/json')
-
-    console.log(`Proxying ${req.method} ${req.url} to OpenAI`)
-  },
-  onProxyRes: (
-    proxyRes: any, // eslint-disable-line @typescript-eslint/no-explicit-any
-    req: Request,
-    res: Response
-  ) => {
-    console.log(`OpenAI responded with status: ${proxyRes.statusCode}`)
-
-    // Add CORS headers to response only for non-streaming responses
-    if (proxyRes.headers['content-type'] !== 'audio/mpeg') {
-      res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*')
-      res.setHeader('Access-Control-Allow-Credentials', 'true')
-    }
-  },
-  onError: (err: Error, req: Request, res: Response) => {
-    console.error('Proxy error:', err)
-    res.status(500).json({
-      error: 'Proxy error occurred',
-      message: err.message
-    })
-  }
-}
-
 // Proxy all requests to /api/openai/* to OpenAI API
-app.use('/api/openai', createProxyMiddleware(openaiProxyOptions))
+// app.use('/api/openai', createProxyMiddleware(openaiProxyOptions))
+app.post('/api/openai/v1/audio/speech', async (req: Request, res: Response) => {
+  try {
+    // Validate and fix the request body
+    const { model, input, voice, ...otherParams } = req.body
+
+    // Validate required fields
+    if (!input) {
+      return res.status(400).json({
+        error: 'Missing required field',
+        message: 'The "input" field is required'
+      })
+    }
+
+    // Fix model name if it's incorrect
+    let correctedModel = model
+    if (model === 'gpt-4o-mini-tts' || !model) {
+      correctedModel = 'tts-1' // Default to tts-1
+    }
+
+    // Validate voice parameter
+    const validVoices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']
+    const correctedVoice = voice && validVoices.includes(voice) ? voice : 'alloy'
+
+    // Prepare the corrected request body
+    const correctedBody = {
+      model: correctedModel,
+      input,
+      voice: correctedVoice,
+      ...otherParams
+    }
+
+    console.log('Proxying TTS request:', {
+      originalModel: model,
+      correctedModel,
+      voice: correctedVoice,
+      inputLength: input?.length
+    })
+
+    const response = await axiosInstance.post('/v1/audio/speech', correctedBody, {
+      responseType: 'stream'
+    })
+
+    // Forward headers from upstream response
+    if (response.headers['content-type']) {
+      res.setHeader('Content-Type', response.headers['content-type'])
+    }
+    if (response.headers['content-length']) {
+      res.setHeader('Content-Length', response.headers['content-length'])
+    }
+
+    // Set a timeout for the response
+    const timeout = setTimeout(() => {
+      if (!res.headersSent) {
+        console.error('Request timeout')
+        res.status(408).json({ error: 'Request timeout' })
+      }
+    }, 60000) // 60 second timeout
+
+    // Handle stream events properly
+    response.data.on('error', (streamError: Error) => {
+      console.error('Stream error:', streamError)
+      clearTimeout(timeout)
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Stream error occurred' })
+      }
+    })
+
+    response.data.on('end', () => {
+      console.log('Stream ended successfully')
+      clearTimeout(timeout)
+    })
+
+    // Handle client disconnect
+    req.on('close', () => {
+      console.log('Client disconnected')
+      clearTimeout(timeout)
+      response.data.destroy()
+    })
+
+    // Pipe the stream to response
+    response.data.pipe(res, { end: true })
+  } catch (error) {
+    if (error instanceof AxiosError) {
+      console.error('Error proxying request to OpenAI:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data
+      })
+      res.status(error.response?.status || 500).json({
+        error: 'TTS generation failed',
+        message: error.response?.data?.error?.message || error.message
+      })
+    } else {
+      console.error('Error proxying request to OpenAI:', error)
+      res.status(500).json({
+        error: 'TTS generation failed',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      })
+    }
+  }
+})
 
 // Error handling middleware
 app.use((err: Error, req: Request, res: Response) => {
