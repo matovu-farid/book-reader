@@ -2,7 +2,21 @@ import { extend, defer, requestAnimationFrame } from '../../utils/core'
 import DefaultViewManager from '../default'
 import Snap from '../helpers/snap'
 import { EVENTS } from '../../utils/constants'
-import debounce from 'lodash/debounce'
+
+// Inline debounce implementation to replace lodash
+function debounce(func, wait) {
+  let timeout
+
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout)
+      func.apply(this, args)
+    }
+
+    clearTimeout(timeout)
+    timeout = setTimeout(later, wait)
+  }
+}
 
 class ContinuousViewManager extends DefaultViewManager {
   constructor(options) {

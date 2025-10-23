@@ -20,6 +20,25 @@ export default defineConfig({
         epubjs: resolve('src/renderer/src/epubjs/src')
       }
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: undefined // Better tree-shaking
+        }
+      },
+      minify: 'terser',
+      terserOptions: {
+        compress: {
+          drop_console: true,
+          drop_debugger: true,
+          dead_code: true,
+          unused: true
+        },
+        mangle: {
+          toplevel: true
+        }
+      }
+    },
     plugins: [
       react({
         babel: {

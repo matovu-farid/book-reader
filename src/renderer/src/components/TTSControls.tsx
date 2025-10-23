@@ -1,15 +1,13 @@
 import { IconButton, Tooltip, Box, CircularProgress, Alert, Snackbar } from '@mui/material'
-import {
-  PlayArrow as PlayIcon,
-  Pause as PauseIcon,
-  Stop as StopIcon,
-  SkipPrevious as PrevIcon,
-  SkipNext as NextIcon,
-  VolumeUp as VolumeIcon,
-  Error as ErrorIcon,
-  Close as CloseIcon,
-  BugReport as DebugIcon
-} from '@mui/icons-material'
+import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import PauseIcon from '@mui/icons-material/Pause'
+import StopIcon from '@mui/icons-material/Stop'
+import SkipPreviousIcon from '@mui/icons-material/SkipPrevious'
+import SkipNextIcon from '@mui/icons-material/SkipNext'
+import VolumeUpIcon from '@mui/icons-material/VolumeUp'
+import ErrorIcon from '@mui/icons-material/Error'
+import CloseIcon from '@mui/icons-material/Close'
+import BugReportIcon from '@mui/icons-material/BugReport'
 import { useEffect, useState } from 'react'
 import { PlayingState } from '@renderer/stores/ttsStore'
 import { Player, PlayerEvent } from '@renderer/models/Player'
@@ -93,7 +91,7 @@ export function TTSControls({ bookId, rendition, disabled = false }: TTSControls
     if (playingState === PlayingState.Playing) {
       return <PauseIcon sx={{ fontSize: 24 }} />
     }
-    return <PlayIcon sx={{ fontSize: 24 }} />
+    return <PlayArrowIcon sx={{ fontSize: 24 }} />
   }
 
   return (
@@ -112,7 +110,7 @@ export function TTSControls({ bookId, rendition, disabled = false }: TTSControls
         }}
       >
         {/* Volume Icon */}
-        <VolumeIcon
+        <VolumeUpIcon
           sx={{
             fontSize: 20,
             color: playingState === PlayingState.Playing ? '#ffffff' : 'rgba(255, 255, 255, 0.7)'
@@ -137,7 +135,7 @@ export function TTSControls({ bookId, rendition, disabled = false }: TTSControls
                 }
               }}
             >
-              <PrevIcon sx={{ fontSize: 24 }} />
+              <SkipPreviousIcon sx={{ fontSize: 24 }} />
             </IconButton>
           </span>
         </Tooltip>
@@ -191,7 +189,7 @@ export function TTSControls({ bookId, rendition, disabled = false }: TTSControls
                 }
               }}
             >
-              <NextIcon sx={{ fontSize: 24 }} />
+              <SkipNextIcon sx={{ fontSize: 24 }} />
             </IconButton>
           </span>
         </Tooltip>
@@ -236,7 +234,7 @@ export function TTSControls({ bookId, rendition, disabled = false }: TTSControls
                   }
                 }}
               >
-                <DebugIcon sx={{ fontSize: 24 }} />
+                <BugReportIcon sx={{ fontSize: 24 }} />
               </IconButton>
             </span>
           </Tooltip>

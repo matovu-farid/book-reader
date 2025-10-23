@@ -14,7 +14,6 @@ export interface QueueItem extends TTSRequest {
   timestamp: number
   retryCount: number
 }
-
 /**
  * TTS Queue Manager
  * Handles queuing and processing of text-to-speech requests with OpenAI API
