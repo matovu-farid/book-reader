@@ -1,49 +1,19 @@
 import express from 'express'
 import type { Request, Response } from 'express'
 import cors from 'cors'
-import rateLimit from 'express-rate-limit'
 import helmet from 'helmet'
 import morgan from 'morgan'
 import { readFileSync } from 'fs'
-import axios, { AxiosError } from 'axios'
-import { Agent as HttpAgent, type AgentOptions } from 'node:http'
-import { Agent as HttpsAgent } from 'node:https'
+import OpenAI from 'openai'
 
 const app = express()
 const PORT = parseInt(process.env.PORT || '5458', 10)
 
 const OPENAI_API_KEY_FILE = process.env.OPENAI_API_KEY_FILE || '/run/secrets/openai_api_key'
 // At the top of the file, after imports
-let cachedApiKey: string | null = null
 
-// Initialize API key once at startup
-const initializeApiKey = () => {
-  try {
-    cachedApiKey = process.env.OPENAI_API_KEY || readFileSync(OPENAI_API_KEY_FILE, 'utf8').trim()
-    console.log('API key initialized successfully')
-  } catch (error) {
-    console.error('Failed to initialize API key:', error)
-    process.exit(1)
-  }
-}
-
-// Call at startup
-initializeApiKey()
-const agentOptions: AgentOptions = {
-  keepAlive: true,
-  maxSockets: 10,
-  keepAliveMsecs: 1 * 60 * 1000
-}
-const axiosInstance = axios.create({
-  baseURL: 'https://api.openai.com',
-  timeout: 120000, // 2 minutes for TTS generation
-  headers: {
-    Authorization: `Bearer ${cachedApiKey}`,
-    'Content-Type': 'application/json'
-  },
-
-  httpAgent: new HttpAgent(agentOptions),
-  httpsAgent: new HttpsAgent(agentOptions)
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY || readFileSync(OPENAI_API_KEY_FILE, 'utf8').trim() || ''
 })
 
 // Security middleware
@@ -62,16 +32,6 @@ app.use(
 
 // Logging
 app.use(morgan('combined'))
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX || '1000', 10), // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false
-})
-app.use(limiter)
 
 // // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {

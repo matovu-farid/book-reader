@@ -1,9 +1,10 @@
-import OpenAI from 'openai'
 import { EventEmitter } from 'events'
 import PriorityQueue from 'priorityqueuejs'
 import type { TTSRequest } from '../../shared/types'
 import { ttsCache } from './ttsCache'
 import { TTSQueueEvents } from '../ipc_handles'
+import config from '../config.json'
+import { is } from '@electron-toolkit/utils'
 
 export interface QueueItem extends TTSRequest {
   priority: number
@@ -21,25 +22,30 @@ export interface QueueItem extends TTSRequest {
 export class TTSQueue extends EventEmitter {
   private queue: PriorityQueue<QueueItem>
   private isProcessing = false
-  private openai: OpenAI | null = null
-  private apiKey: string | null = null
+
+  private openaiProxyUrl: string = ''
+  // private apiKey: string | null = null
   private readonly activeRequests = new Map<string, QueueItem>()
   private readonly pendingRequests = new Map<string, QueueItem>()
   private readonly pendingTimeouts = new Set<NodeJS.Timeout>()
   private readonly MAX_RETRIES = 3
   private readonly RETRY_DELAY_MS = 1000
-  private readonly REQUEST_TIMEOUT_MS = 30000
+  private readonly REQUEST_TIMEOUT_MS = 1 * 60 * 1000
   private readonly MAX_QUEUE_SIZE = 15
 
   constructor() {
     super()
+    if (is.dev) {
+      this.openaiProxyUrl = config.development.player.openaiProxyUrl
+    } else {
+      this.openaiProxyUrl = config.production.player.openaiProxyUrl
+    }
 
     // Priority queue comparator: higher priority first
     /**
      * Initialize priority queue with custom comparator (higher priority first)
      */
     this.queue = new PriorityQueue((a: QueueItem, b: QueueItem) => b.priority - a.priority)
-    this.initializeOpenAI()
     this.on(TTSQueueEvents.REQUEST_AUDIO, this.maintainQueueSize)
   }
 
@@ -52,26 +58,6 @@ export class TTSQueue extends EventEmitter {
   }
 
   /**
-   * Initialize OpenAI client with API key from environment
-   */
-  private initializeOpenAI(): void {
-    this.apiKey = process.env.OPENAI_API_KEY || null
-
-    if (this.apiKey) {
-      this.openai = new OpenAI({
-        apiKey: this.apiKey
-      })
-    }
-  }
-
-  /**
-   * Check if OpenAI API key is configured
-   */
-  hasApiKey(): boolean {
-    return !!this.apiKey && !!this.openai
-  }
-
-  /**
    * Add a TTS request to the queue (cache check should be done by caller)
    */
   requestAudio(
@@ -80,9 +66,6 @@ export class TTSQueue extends EventEmitter {
     text: string,
     priority = 0 // 0 is normal priority, 1 is high priority, 2 is highest priority
   ): Promise<string> {
-    if (!this.hasApiKey()) {
-      throw new Error('OpenAI API key not configured')
-    }
     this.emit(TTSQueueEvents.REQUEST_AUDIO, { bookId, cfiRange, text, priority })
 
     // Create unique request ID for deduplication
@@ -145,30 +128,35 @@ export class TTSQueue extends EventEmitter {
 
       // Start processing if not already running
       if (!this.isProcessing) {
-        void this.processQueue()
+        void this.processBatch()
       }
     })
+  }
+
+  private async processBatch(): Promise<void> {
+    this.isProcessing = true
+    const batchSize = 5
+    while (this.queue.size() > 0) {
+      const batch: QueueItem[] = []
+      for (let i = 0; i < Math.min(batchSize, this.queue.size()); i++) {
+        const item = this.queue.deq()
+        batch.push(item)
+      }
+      await this.processQueue(batch)
+    }
   }
 
   /**
    * Process the queue sequentially
    */
-  private async processQueue(): Promise<void> {
-    if (this.isProcessing || this.queue.isEmpty()) {
-      return
-    }
-
-    this.isProcessing = true
-
-    while (!this.queue.isEmpty()) {
-      const item = this.queue.deq()
-
+  private async processQueue(batch: QueueItem[]): Promise<void> {
+    const promises = batch.map(async (item) => {
       // Check if request is too old and should be cancelled
       if (Date.now() - item.timestamp > this.REQUEST_TIMEOUT_MS) {
         console.log(`Request timeout, cancelling: ${item.requestId}`)
         this.pendingRequests.delete(item.requestId)
         item.reject(new Error('Request timeout'))
-        continue
+        return
       }
 
       // Track active request
@@ -212,7 +200,7 @@ export class TTSQueue extends EventEmitter {
               this.pendingRequests.set(item.requestId, item)
               this.pendingTimeouts.delete(timeout)
               if (!this.isProcessing) {
-                void this.processQueue()
+                void this.processBatch()
               }
             },
             this.RETRY_DELAY_MS * Math.pow(2, item.retryCount - 1)
@@ -233,7 +221,9 @@ export class TTSQueue extends EventEmitter {
           console.error('TTS generation failed:', error)
         }
       }
-    }
+    })
+
+    await Promise.all(promises)
 
     this.isProcessing = false
   }
@@ -242,17 +232,24 @@ export class TTSQueue extends EventEmitter {
    * Generate audio using OpenAI TTS API
    */
   private async generateAudio(item: QueueItem): Promise<Buffer> {
-    if (!this.openai) {
-      throw new Error('OpenAI client not initialized')
-    }
-
     try {
-      const response = await this.openai.audio.speech.create({
-        model: 'tts-1',
-        voice: 'alloy',
-        input: item.text,
-        response_format: 'mp3',
-        speed: 1.0
+      //const url = `http://${this.openaiProxyUrl}/v1/audio/speech`
+      // const url = `https://api.openai.com/v1/audio/speech`
+      const url = 'http://proxy.matovu-farid.com/api/openai/v1/audio/speech'
+      console.log('Generating audio for:', url)
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+          // Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'tts-1',
+          voice: 'alloy',
+          input: item.text,
+          response_format: 'mp3',
+          speed: 1.0
+        })
       })
 
       // Convert response to buffer

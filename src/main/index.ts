@@ -99,14 +99,7 @@ function iPCHandlers(): void {
     }
   })
 
-  ipcMain.handle(IPC_HANDLERS.TTS_GET_API_KEY_STATUS , () => {
-    try {
-      return ttsService.hasApiKey()
-    } catch (error) {
-      console.error('Failed to get API key status:', error)
-      return false
-    }
-  })
+
   ipcMain.handle(IPC_HANDLERS.TTS_SHOULD_DEBUG, (): boolean => {
     if (process.env.NODE_ENV === 'development') {
       return config.development.player.recordPlayingState

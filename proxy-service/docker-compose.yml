@@ -58,5 +58,5 @@ secrets:
 
 networks:
   proxy-network:
-    # driver: bridge
-    driver: overlay # overlay -> remote, bridge -> local
+    driver: bridge
+    # driver: overlay # overlay -> remote, bridge -> local
