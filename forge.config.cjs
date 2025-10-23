@@ -1,26 +1,33 @@
 module.exports = {
   packagerConfig: {
     platform: ['darwin', 'linux', 'win32'],
+    prune: true,
+    asar: {
+      unpack: '*.{node,dll}'
+    },
     ignore: [
       /^\/src/,
-      /(.eslintrc.json)|(.gitignore)|(electron.vite.config.ts)|(forge.config.cjs)|(tsconfig.*)/,
       /^\/tests/,
       /^\/docs/,
       /^\/examples/,
-      /\.map$/,
-      /README/,
       /^\/proxy-service/,
-      /^\/cypress/,
       /^\/assets/,
+      /^\/build/,
+      /^\/resources/,
+      /\.map$/,
       /\.md$/,
-      /node_modules\/.*\/test/,
-      /node_modules\/.*\/tests/,
-      /node_modules\/.*\/docs/,
-      /node_modules\/.*\/examples/,
-      /node_modules\/.*\/\.github/,
-      /node_modules\/.*\/CHANGELOG/,
-      /node_modules\/.*\/LICENSE/,
-      /node_modules\/.*\/README/
+      /\.ts$/,
+      /\.tsx$/,
+      /tsconfig.*\.json$/,
+      /tsconfig.*\.tsbuildinfo$/,
+      /\.eslintrc/,
+      /\.prettier/,
+      /vitest\.config/,
+      /electron\.vite\.config/,
+      /forge\.config/,
+      /tailwind\.config/,
+      /postcss\.config/,
+      /^\/\.\w+/
     ]
   },
   rebuildConfig: {},
