@@ -20,6 +20,9 @@ export default defineConfig({
         epubjs: resolve('src/renderer/src/epubjs/src')
       }
     },
+    optimizeDeps: {
+      include: ['@mui/material/styles', '@mui/material', '@mui/icons-material']
+    },
     build: {
       rollupOptions: {
         output: {
