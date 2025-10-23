@@ -1,4 +1,8 @@
-import { IconButton, Tooltip, Box, CircularProgress, Alert, Snackbar } from '@mui/material'
+import IconButton from '@mui/material/IconButton'
+import Box from '@mui/material/Box'
+import CircularProgress from '@mui/material/CircularProgress'
+import Alert from '@mui/material/Alert'
+import Snackbar from '@mui/material/Snackbar'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import PauseIcon from '@mui/icons-material/Pause'
 import StopIcon from '@mui/icons-material/Stop'
@@ -118,126 +122,104 @@ export function TTSControls({ bookId, rendition, disabled = false }: TTSControls
         />
 
         {/* Previous Button */}
-        <Tooltip title="Previous Paragraph">
-          <span>
-            <IconButton
-              size="large"
-              onClick={handlePrev}
-              disabled={disabled || playingState === PlayingState.Loading}
-              sx={{
-                padding: 1,
-                color: '#ffffff',
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                },
-                '&:disabled': {
-                  color: 'rgba(255, 255, 255, 0.3)'
-                }
-              }}
-            >
-              <SkipPreviousIcon sx={{ fontSize: 24 }} />
-            </IconButton>
-          </span>
-        </Tooltip>
+
+        <IconButton
+          size="large"
+          onClick={handlePrev}
+          disabled={disabled || playingState === PlayingState.Loading}
+          sx={{
+            padding: 1,
+            color: '#ffffff',
+            '&:hover': {
+              backgroundColor: 'rgba(255, 255, 255, 0.1)'
+            },
+            '&:disabled': {
+              color: 'rgba(255, 255, 255, 0.3)'
+            }
+          }}
+        >
+          <SkipPreviousIcon sx={{ fontSize: 24 }} />
+        </IconButton>
 
         {/* Play/Pause Button */}
-        <Tooltip
-          title={
-            playingState === PlayingState.Playing
-              ? 'Pause'
-              : playingState === PlayingState.Paused
-                ? 'Resume'
-                : 'Play'
-          }
+
+        <IconButton
+          size="large"
+          onClick={handlePlay}
+          disabled={disabled}
+          sx={{
+            padding: 1,
+            color: playingState === PlayingState.Playing ? '#ffffff' : 'rgba(255, 255, 255, 0.8)',
+            '&:hover': {
+              backgroundColor: 'rgba(255, 255, 255, 0.1)'
+            },
+            '&:disabled': {
+              color: 'rgba(255, 255, 255, 0.3)'
+            }
+          }}
         >
-          <span>
-            <IconButton
-              size="large"
-              onClick={handlePlay}
-              disabled={disabled}
-              sx={{
-                padding: 1,
-                color:
-                  playingState === PlayingState.Playing ? '#ffffff' : 'rgba(255, 255, 255, 0.8)',
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                },
-                '&:disabled': {
-                  color: 'rgba(255, 255, 255, 0.3)'
-                }
-              }}
-            >
-              {getPlayIcon()}
-            </IconButton>
-          </span>
-        </Tooltip>
+          {getPlayIcon()}
+        </IconButton>
+
         {/* Next Button */}
-        <Tooltip title="Next Paragraph">
-          <span>
-            <IconButton
-              size="large"
-              onClick={handleNext}
-              disabled={disabled || playingState === PlayingState.Loading}
-              sx={{
-                padding: 1,
-                color: '#ffffff',
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                },
-                '&:disabled': {
-                  color: 'rgba(255, 255, 255, 0.3)'
-                }
-              }}
-            >
-              <SkipNextIcon sx={{ fontSize: 24 }} />
-            </IconButton>
-          </span>
-        </Tooltip>
+
+        <IconButton
+          size="large"
+          onClick={handleNext}
+          disabled={disabled || playingState === PlayingState.Loading}
+          sx={{
+            padding: 1,
+            color: '#ffffff',
+            '&:hover': {
+              backgroundColor: 'rgba(255, 255, 255, 0.1)'
+            },
+            '&:disabled': {
+              color: 'rgba(255, 255, 255, 0.3)'
+            }
+          }}
+        >
+          <SkipNextIcon sx={{ fontSize: 24 }} />
+        </IconButton>
+
         {/* Stop Button */}
-        <Tooltip title="Stop">
-          <span>
-            <IconButton
-              size="large"
-              onClick={handleStop}
-              disabled={disabled || playingState !== PlayingState.Playing}
-              sx={{
-                padding: 1,
-                color: '#ffffff',
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                },
-                '&:disabled': {
-                  color: 'rgba(255, 255, 255, 0.3)'
-                }
-              }}
-            >
-              <StopIcon sx={{ fontSize: 24 }} />
-            </IconButton>
-          </span>
-        </Tooltip>
+
+        <IconButton
+          size="large"
+          onClick={handleStop}
+          disabled={disabled || playingState !== PlayingState.Playing}
+          sx={{
+            padding: 1,
+            color: '#ffffff',
+            '&:hover': {
+              backgroundColor: 'rgba(255, 255, 255, 0.1)'
+            },
+            '&:disabled': {
+              color: 'rgba(255, 255, 255, 0.3)'
+            }
+          }}
+        >
+          <StopIcon sx={{ fontSize: 24 }} />
+        </IconButton>
+
         {/* Debug Button */}
         {shouldDebug && (
-          <Tooltip title="Debug">
-            <span>
-              <IconButton
-                size="large"
-                onClick={() => setIsDebugging((isDebugging) => !isDebugging)}
-                disabled={disabled || playingState !== PlayingState.Playing}
-                sx={{
-                  padding: 1,
-                  color: '#ffffff',
-                  '&:hover': {
-                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                  },
-                  '&:disabled': {
-                    color: 'rgba(255, 255, 255, 0.3)'
-                  }
-                }}
-              >
-                <BugReportIcon sx={{ fontSize: 24 }} />
-              </IconButton>
-            </span>
-          </Tooltip>
+          <IconButton
+            size="large"
+            onClick={() => setIsDebugging((isDebugging) => !isDebugging)}
+            disabled={disabled || playingState !== PlayingState.Playing}
+            sx={{
+              padding: 1,
+              color: '#ffffff',
+              '&:hover': {
+                backgroundColor: 'rgba(255, 255, 255, 0.1)'
+              },
+              '&:disabled': {
+                color: 'rgba(255, 255, 255, 0.3)'
+              }
+            }}
+          >
+            <BugReportIcon sx={{ fontSize: 24 }} />
+          </IconButton>
         )}
 
         {/* Error Icon (if there's an error) */}
