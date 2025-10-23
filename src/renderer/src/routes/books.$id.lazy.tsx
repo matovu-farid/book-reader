@@ -89,8 +89,8 @@ function BookView(): React.JSX.Element {
       console.log({ error })
     },
     async onSuccess() {
-      queryClient.invalidateQueries({ queryKey: ['book'] })
-      queryClient.invalidateQueries({ queryKey: ['pageView'] })
+      await queryClient.invalidateQueries({ queryKey: ['book'] })
+      await queryClient.invalidateQueries({ queryKey: ['pageView'] })
     }
   })
 

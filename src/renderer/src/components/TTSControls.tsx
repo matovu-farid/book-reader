@@ -74,16 +74,16 @@ export function TTSControls({ bookId, rendition, disabled = false }: TTSControls
     return player.play()
   }
 
-  const handleStop = () => {
-    player.stop()
+  const handleStop = async () => {
+    await player.stop()
   }
 
-  const handlePrev = () => {
-    player.prev()
+  const handlePrev = async () => {
+    await player.prev()
   }
 
-  const handleNext = () => {
-    player.next()
+  const handleNext = async () => {
+    await player.next()
   }
 
   const getPlayIcon = () => {

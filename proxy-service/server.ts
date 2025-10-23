@@ -44,110 +44,25 @@ app.get('/health', (req: Request, res: Response) => {
 
 // Proxy all requests to /api/openai/* to OpenAI API
 // app.use('/api/openai', createProxyMiddleware(openaiProxyOptions))
-app.post('/api/openai/v1/audio/speech', async (req: Request, res: Response) => {
-  try {
-    // Validate and fix the request body
-    const { model, input, voice, ...otherParams } = req.body
 
-    // Validate required fields
-    if (!input) {
-      return res.status(400).json({
-        error: 'Missing required field',
-        message: 'The "input" field is required'
-      })
-    }
-
-    // Fix model name if it's incorrect
-    let correctedModel = model
-    if (model === 'gpt-4o-mini-tts' || !model) {
-      correctedModel = 'tts-1' // Default to tts-1
-    }
-
-    // Validate voice parameter
-    const validVoices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']
-    const correctedVoice = voice && validVoices.includes(voice) ? voice : 'alloy'
-
-    // Prepare the corrected request body
-    const correctedBody = {
-      model: correctedModel,
-      input,
-      voice: correctedVoice,
-      ...otherParams
-    }
-
-    console.log('Proxying TTS request:', {
-      originalModel: model,
-      correctedModel,
-      voice: correctedVoice,
-      inputLength: input?.length
-    })
-
-    const response = await axiosInstance.post('/v1/audio/speech', correctedBody, {
-      responseType: 'stream'
-    })
-
-    // Forward headers from upstream response
-    if (response.headers['content-type']) {
-      res.setHeader('Content-Type', response.headers['content-type'])
-    }
-    if (response.headers['content-length']) {
-      res.setHeader('Content-Length', response.headers['content-length'])
-    }
-
-    // Set a timeout for the response
-    const timeout = setTimeout(() => {
-      if (!res.headersSent) {
-        console.error('Request timeout')
-        res.status(408).json({ error: 'Request timeout' })
-      }
-    }, 60000) // 60 second timeout
-
-    // Handle stream events properly
-    response.data.on('error', (streamError: Error) => {
-      console.error('Stream error:', streamError)
-      clearTimeout(timeout)
-      if (!res.headersSent) {
-        res.status(500).json({ error: 'Stream error occurred' })
-      }
-    })
-
-    response.data.on('end', () => {
-      console.log('Stream ended successfully')
-      clearTimeout(timeout)
-    })
-
-    // Handle client disconnect
-    req.on('close', () => {
-      console.log('Client disconnected')
-      clearTimeout(timeout)
-      response.data.destroy()
-    })
-
-    // Pipe the stream to response
-    response.data.pipe(res, { end: true })
-  } catch (error) {
-    if (error instanceof AxiosError) {
-      console.error('Error proxying request to OpenAI:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data
-      })
-      res.status(error.response?.status || 500).json({
-        error: 'TTS generation failed',
-        message: error.response?.data?.error?.message || error.message
-      })
-    } else {
-      console.error('Error proxying request to OpenAI:', error)
-      res.status(500).json({
-        error: 'TTS generation failed',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      })
-    }
-  }
+app.post('/api/openai/v1/audio/speech', async (req, res) => {
+  // Validate and fix the request body
+  const { model, input, voice, ...otherParams } = req.body
+  const response = await openai.audio.speech.create({
+    model,
+    input,
+    voice,
+    ...otherParams
+  })
+  const buffer = Buffer.from(await response.arrayBuffer())
+  res.setHeader('Content-Type', 'audio/mpeg')
+  res.setHeader('Content-Length', buffer.length.toString())
+  res.send(buffer)
 })
 
 // Error handling middleware
-app.use((err: Error, req: Request, res: Response) => {
+
+app.use((err: Error, req: Request, res: Response, next: express.NextFunction) => {
   console.error('Unhandled error:', err)
   res.status(500).json({
     error: 'Internal server error',

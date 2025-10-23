@@ -136,13 +136,6 @@ export class TTSService extends EventEmitter {
   }
 
   /**
-   * Check if OpenAI API key is configured
-   */
-  hasApiKey(): boolean {
-    return ttsQueue.hasApiKey()
-  }
-
-  /**
    * Get queue status
    */
   getQueueStatus(): { pending: number; isProcessing: boolean; active: number } {

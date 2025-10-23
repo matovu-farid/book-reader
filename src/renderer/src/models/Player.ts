@@ -46,7 +46,6 @@ export class Player extends EventEmitter<PlayerEventMap> {
   private direction: Direction = Direction.Forward
   private nextPageParagraphs: ParagraphWithCFI[]
   private previousPageParagraphs: ParagraphWithCFI[]
-  private hasApiKey: boolean
   constructor(rendition: Rendition, bookId: string) {
     super()
     this.rendition = rendition
@@ -54,8 +53,7 @@ export class Player extends EventEmitter<PlayerEventMap> {
     this.setParagraphIndex(0)
 
     this.bookId = bookId
-    this.hasApiKey = false
-    void this.checkApiKey()
+
     // this.paragraphs = rendition.getCurrentViewParagraphs() || []
     rendition.on(EVENTS.RENDITION.RENDERED, () => {
       this.paragraphs = rendition.getCurrentViewParagraphs() || []
@@ -153,12 +151,6 @@ export class Player extends EventEmitter<PlayerEventMap> {
   public async play() {
     if (this.playingState === PlayingState.Playing) return
     this.setPlayingState(PlayingState.Playing)
-
-    if (!this.hasApiKey) {
-      console.error('🎵 No API key available')
-      this.errors.push('OpenAI API key not configured')
-      return
-    }
 
     if (this.paragraphs.length === 0) {
       console.error('🎵 No paragraphs available')
@@ -358,16 +350,6 @@ export class Player extends EventEmitter<PlayerEventMap> {
   }
   private getPrefetchPriority() {
     return this.priority - 1
-  }
-  private checkApiKey() {
-    return window.functions.getTTSApiKeyStatus().then((hasApiKey) => {
-      this.hasApiKey = hasApiKey
-      if (!hasApiKey) {
-        this.errors.push('OpenAI API key not configured')
-        this.setPlayingState(PlayingState.Stopped)
-      }
-      return hasApiKey
-    })
   }
 
   private highlightParagraph(paragraph: ParagraphWithCFI) {

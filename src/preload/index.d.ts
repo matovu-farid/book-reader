@@ -31,7 +31,6 @@ declare global {
         priority?: number
       ) => Promise<string>
       getTTSAudioPath: (bookId: string, cfiRange: string) => Promise<string | null>
-      getTTSApiKeyStatus: () => Promise<boolean>
       getTTSQueueStatus: () => Promise<{ pending: number; isProcessing: boolean; active: number }>
       clearTTSCache: (bookId: string) => Promise<void>
       getTTSCacheSize: (bookId: string) => Promise<number>
