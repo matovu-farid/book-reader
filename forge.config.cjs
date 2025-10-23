@@ -9,6 +9,7 @@ module.exports = {
   makers: [
     {
       name: '@electron-forge/maker-zip',
+      platforms: ['darwin', 'linux', 'win32'],
       config: (arch) => ({
         // Note that we must provide this S3 URL here
         // in order to support smooth version transitions
@@ -39,7 +40,8 @@ module.exports = {
       name: '@electron-forge/publisher-s3',
       config: {
         bucket: 'rishi-electron-app',
-        public: true
+        public: false,
+        region: 'us-east-1'
       }
     }
   ]

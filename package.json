@@ -15,6 +15,7 @@
     "dev": "NODE_ENV=production electron-vite dev --outDir=dist",
     "package": "NODE_ENV=production electron-vite build --outDir=dist && electron-forge package",
     "make": "NODE_ENV=development electron-vite build --outDir=dist && electron-forge make",
+    "publish": "NODE_ENV=production electron-vite build --outDir=dist && electron-forge make && electron-forge publish",
     "build": "NODE_ENV=production  electron-vite build",
     "test": "vitest",
     "test:ui": "vitest --ui"
