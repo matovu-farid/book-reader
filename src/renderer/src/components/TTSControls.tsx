@@ -1,17 +1,16 @@
-import IconButton from '@mui/material/IconButton'
-import Box from '@mui/material/Box'
-import CircularProgress from '@mui/material/CircularProgress'
-import Alert from '@mui/material/Alert'
-import Snackbar from '@mui/material/Snackbar'
-import PlayArrowIcon from '@mui/icons-material/PlayArrow'
-import PauseIcon from '@mui/icons-material/Pause'
-import StopIcon from '@mui/icons-material/Stop'
-import SkipPreviousIcon from '@mui/icons-material/SkipPrevious'
-import SkipNextIcon from '@mui/icons-material/SkipNext'
-import VolumeUpIcon from '@mui/icons-material/VolumeUp'
-import ErrorIcon from '@mui/icons-material/Error'
-import CloseIcon from '@mui/icons-material/Close'
-import BugReportIcon from '@mui/icons-material/BugReport'
+import { IconButton } from './ui/IconButton'
+import { Spinner } from './ui/Spinner'
+import {
+  Play,
+  Pause,
+  Square,
+  SkipBack,
+  SkipForward,
+  Volume2,
+  AlertTriangle,
+  Bug
+} from 'lucide-react'
+import { toast } from 'react-toastify'
 import { useEffect, useState } from 'react'
 import { PlayingState } from '@renderer/stores/ttsStore'
 import { Player, PlayerEvent } from '@renderer/models/Player'
@@ -90,115 +89,63 @@ export function TTSControls({ bookId, rendition, disabled = false }: TTSControls
 
   const getPlayIcon = () => {
     if (playingState === PlayingState.Loading) {
-      return <CircularProgress size={24} color="inherit" />
+      return <Spinner size="medium" color="currentColor" />
     }
     if (playingState === PlayingState.Playing) {
-      return <PauseIcon sx={{ fontSize: 24 }} />
+      return <Pause size={24} />
     }
-    return <PlayArrowIcon sx={{ fontSize: 24 }} />
+    return <Play size={24} />
   }
 
   return (
     <>
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 2,
-          padding: '12px 24px',
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          borderRadius: '24px',
-          backdropFilter: 'blur(8px)',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-          border: '1px solid rgba(255, 255, 255, 0.1)'
-        }}
-      >
+      <div className="flex items-center gap-4 px-6 py-3 bg-black/80 rounded-3xl backdrop-blur-lg shadow-lg border border-white/10">
         {/* Volume Icon */}
-        <VolumeUpIcon
-          sx={{
-            fontSize: 20,
-            color: playingState === PlayingState.Playing ? '#ffffff' : 'rgba(255, 255, 255, 0.7)'
-          }}
+        <Volume2
+          size={20}
+          className={playingState === PlayingState.Playing ? 'text-white' : 'text-white/70'}
         />
 
         {/* Previous Button */}
-
         <IconButton
           size="large"
           onClick={handlePrev}
           disabled={disabled || playingState === PlayingState.Loading}
-          sx={{
-            padding: 1,
-            color: '#ffffff',
-            '&:hover': {
-              backgroundColor: 'rgba(255, 255, 255, 0.1)'
-            },
-            '&:disabled': {
-              color: 'rgba(255, 255, 255, 0.3)'
-            }
-          }}
+          className="text-white hover:bg-white/10 disabled:text-white/30"
         >
-          <SkipPreviousIcon sx={{ fontSize: 24 }} />
+          <SkipBack size={24} />
         </IconButton>
 
         {/* Play/Pause Button */}
-
         <IconButton
           size="large"
           onClick={handlePlay}
           disabled={disabled}
-          sx={{
-            padding: 1,
-            color: playingState === PlayingState.Playing ? '#ffffff' : 'rgba(255, 255, 255, 0.8)',
-            '&:hover': {
-              backgroundColor: 'rgba(255, 255, 255, 0.1)'
-            },
-            '&:disabled': {
-              color: 'rgba(255, 255, 255, 0.3)'
-            }
-          }}
+          className={`text-white hover:bg-white/10 disabled:text-white/30 ${
+            playingState === PlayingState.Playing ? 'text-white' : 'text-white/80'
+          }`}
         >
           {getPlayIcon()}
         </IconButton>
 
         {/* Next Button */}
-
         <IconButton
           size="large"
           onClick={handleNext}
           disabled={disabled || playingState === PlayingState.Loading}
-          sx={{
-            padding: 1,
-            color: '#ffffff',
-            '&:hover': {
-              backgroundColor: 'rgba(255, 255, 255, 0.1)'
-            },
-            '&:disabled': {
-              color: 'rgba(255, 255, 255, 0.3)'
-            }
-          }}
+          className="text-white hover:bg-white/10 disabled:text-white/30"
         >
-          <SkipNextIcon sx={{ fontSize: 24 }} />
+          <SkipForward size={24} />
         </IconButton>
 
         {/* Stop Button */}
-
         <IconButton
           size="large"
           onClick={handleStop}
           disabled={disabled || playingState !== PlayingState.Playing}
-          sx={{
-            padding: 1,
-            color: '#ffffff',
-            '&:hover': {
-              backgroundColor: 'rgba(255, 255, 255, 0.1)'
-            },
-            '&:disabled': {
-              color: 'rgba(255, 255, 255, 0.3)'
-            }
-          }}
+          className="text-white hover:bg-white/10 disabled:text-white/30"
         >
-          <StopIcon sx={{ fontSize: 24 }} />
+          <Square size={24} />
         </IconButton>
 
         {/* Debug Button */}
@@ -207,52 +154,30 @@ export function TTSControls({ bookId, rendition, disabled = false }: TTSControls
             size="large"
             onClick={() => setIsDebugging((isDebugging) => !isDebugging)}
             disabled={disabled || playingState !== PlayingState.Playing}
-            sx={{
-              padding: 1,
-              color: '#ffffff',
-              '&:hover': {
-                backgroundColor: 'rgba(255, 255, 255, 0.1)'
-              },
-              '&:disabled': {
-                color: 'rgba(255, 255, 255, 0.3)'
-              }
-            }}
+            className="text-white hover:bg-white/10 disabled:text-white/30"
           >
-            <BugReportIcon sx={{ fontSize: 24 }} />
+            <Bug size={24} />
           </IconButton>
         )}
 
         {/* Error Icon (if there's an error) */}
-        {errors.length > 0 && (
-          <ErrorIcon
-            sx={{
-              fontSize: 20,
-              color: '#ff6b6b'
-            }}
-          />
-        )}
-      </Box>
+        {errors.length > 0 && <AlertTriangle size={20} className="text-red-500" />}
+      </div>
 
-      {/* Error Snackbar */}
-      <Snackbar
-        open={showError && !!error}
-        autoHideDuration={6000}
-        onClose={handleErrorClose}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
-        <Alert
-          onClose={handleErrorClose}
-          severity="error"
-          sx={{ width: '100%' }}
-          action={
-            <IconButton size="small" aria-label="close" color="inherit" onClick={handleErrorClose}>
-              <CloseIcon fontSize="small" />
-            </IconButton>
-          }
-        >
-          {error}
-        </Alert>
-      </Snackbar>
+      {/* Error Toast */}
+      {showError && !!error && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
+          {toast.error(error, {
+            position: 'top-center',
+            autoClose: 6000,
+            hideProgressBar: false,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+            onClose: handleErrorClose
+          })}
+        </div>
+      )}
     </>
   )
 }

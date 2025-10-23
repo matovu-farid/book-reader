@@ -5,21 +5,25 @@ import { ReactReader } from '@renderer/components/react-reader'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-toastify'
 import { Book } from 'src/shared/types'
-import React, { useEffect, useRef, useState, useMemo } from 'react'
-import { Button, FormControlLabel, IconButton, Radio, RadioGroup } from '@mui/material'
+import React, { useEffect, useRef } from 'react'
+import { Button } from '@renderer/components/ui/Button'
+import { IconButton } from '@renderer/components/ui/IconButton'
+import { Menu } from '@renderer/components/ui/Menu'
+import { Radio, RadioGroup } from '@renderer/components/ui/Radio'
 import type { Rendition } from '@epubjs'
-import Menu from '@mui/material/Menu'
-import { usePopupState, bindTrigger, bindMenu } from 'material-ui-popup-state/hooks'
 import { ThemeType } from '@renderer/themes/common'
 import { themes } from '@renderer/themes/themes'
 import createIReactReaderTheme from '@renderer/themes/readerThemes'
-import { ThemeProvider, THEME_ID, createTheme } from '@mui/material/styles'
-import PaletteIcon from '@mui/icons-material/Palette'
+import { Palette } from 'lucide-react'
+import { useState } from 'react'
 import { TTSControls } from '@renderer/components/TTSControls'
 
 export const Route = createLazyFileRoute('/books/$id')({
   component: () => <BookView />
 })
+function cn(...classes: string[]) {
+  return classes.filter(Boolean).join(' ')
+}
 
 function updateTheme(rendition: Rendition, theme: ThemeType) {
   const reditionThemes = rendition.themes
@@ -33,7 +37,7 @@ function BookView(): React.JSX.Element {
   const rendition = useRef<Rendition | undefined>(undefined)
   const [renditionState, setRenditionState] = useState<Rendition | null>()
   const [theme, setTheme] = useState<ThemeType>(ThemeType.White)
-  const popupState = usePopupState({ variant: 'popover', popupId: 'demoMenu' })
+  const [menuOpen, setMenuOpen] = useState(false)
   useEffect(() => {
     if (rendition.current) {
       updateTheme(rendition.current, theme)
@@ -54,30 +58,10 @@ function BookView(): React.JSX.Element {
       return book
     }
   })
-  const materialTheme = useMemo(
-    () =>
-      createTheme({
-        palette: {
-          primary: {
-            main: themes[theme].color,
-            contrastText: themes[theme].background
-          }
-        },
-        components: {
-          MuiMenu: {
-            styleOverrides: {
-              list: {
-                '&[role="menu"]': {
-                  backgroundColor: themes[theme].background,
-                  color: themes[theme].color
-                }
-              }
-            }
-          }
-        }
-      }),
-    [theme]
-  )
+  const handleThemeChange = (newTheme: ThemeType) => {
+    setTheme(newTheme)
+    setMenuOpen(false)
+  }
   const queryClient = useQueryClient()
   const updateBookId = useMutation({
     mutationFn: async ({ book, newId }: { book: Book; newId: string }) => {
@@ -110,69 +94,84 @@ function BookView(): React.JSX.Element {
       </div>
     )
 
-  return (
-    <ThemeProvider theme={{ [THEME_ID]: materialTheme }}>
-      <div className="relative">
-        <div className="absolute right-2 top-2 z-10 flex items-center gap-2">
-          <Link to="/">
-            <Button
-              disabled={book.currentBookId === 0}
-              variant="text"
-              className="disabled:invisible"
-            >
-              Back
-            </Button>
-          </Link>
+  function getTextColor() {
+    switch (theme) {
+      case ThemeType.White:
+        return 'text-black hover:bg-black/10 hover:text-black'
+      case ThemeType.Dark:
+        return 'text-white hover:bg-white/10 hover:text-white'
+      default:
+        return 'text-black hover:bg-black/10 hover:text-black'
+    }
+  }
 
-          <IconButton {...bindTrigger(popupState)}>
-            <PaletteIcon color="primary" />
-          </IconButton>
-          <Menu {...bindMenu(popupState)}>
+  return (
+    <div className="relative">
+      <div className="absolute right-2 top-2 z-10 flex items-center gap-2">
+        <Link to="/">
+          <Button
+            disabled={book.currentBookId === 0}
+            variant="ghost"
+            className={cn('disabled:invisible', getTextColor())}
+          >
+            Back
+          </Button>
+        </Link>
+
+        <Menu
+          trigger={
+            <IconButton className={cn('hover:bg-transparent border-none')}>
+              <Palette size={20} className={getTextColor()} />
+            </IconButton>
+          }
+          open={menuOpen}
+          onOpen={() => setMenuOpen(true)}
+          onClose={() => setMenuOpen(false)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          theme={themes[theme]}
+        >
+          <div className="p-3">
             <RadioGroup
-              aria-labelledby="demo-radio-buttons-group-label"
-              defaultValue={theme}
-              name="radio-buttons-group"
-              sx={{ padding: '10px' }}
-              onChange={(e) => {
-                setTheme(e.target.value as ThemeType)
-                popupState.close()
-              }}
+              value={theme}
+              onChange={(value) => handleThemeChange(value as ThemeType)}
+              name="theme-selector"
+              theme={themes[theme]}
             >
-              {(Object.keys(themes) as Array<keyof typeof themes>).map((theme) => (
-                <FormControlLabel key={theme} value={theme} control={<Radio />} label={theme} />
+              {(Object.keys(themes) as Array<keyof typeof themes>).map((themeKey) => (
+                <Radio key={themeKey} value={themeKey} label={themeKey} theme={themes[theme]} />
               ))}
             </RadioGroup>
-          </Menu>
-        </div>
-
-        <div style={{ height: '100vh' }}>
-          <ReactReader
-            loadingView={
-              <div className="w-full h-screen grid items-center">
-                <Loader />
-              </div>
-            }
-            url={book.epubUrl}
-            title={book.title}
-            location={book.currentBookId || 0}
-            locationChanged={(epubcfi: string) => {
-              updateBookId.mutate({ book, newId: epubcfi })
-            }}
-            swipeable={true}
-            readerStyles={createIReactReaderTheme(themes[theme].readerTheme)}
-            getRendition={(_rendition) => {
-              updateTheme(_rendition, theme)
-              rendition.current = _rendition
-              setRenditionState(_rendition)
-            }}
-          />
-        </div>
-
-        {/* TTS Controls - Bottom Center */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-50">
-          {renditionState && <TTSControls bookId={book.id} rendition={renditionState} />}
-        </div>
+          </div>
+        </Menu>
       </div>
-    </ThemeProvider>
+
+      <div style={{ height: '100vh' }}>
+        <ReactReader
+          loadingView={
+            <div className="w-full h-screen grid items-center">
+              <Loader />
+            </div>
+          }
+          url={book.epubUrl}
+          title={book.title}
+          location={book.currentBookId || 0}
+          locationChanged={(epubcfi: string) => {
+            updateBookId.mutate({ book, newId: epubcfi })
+          }}
+          swipeable={true}
+          readerStyles={createIReactReaderTheme(themes[theme].readerTheme)}
+          getRendition={(_rendition) => {
+            updateTheme(_rendition, theme)
+            rendition.current = _rendition
+            setRenditionState(_rendition)
+          }}
+        />
+      </div>
+
+      {/* TTS Controls - Bottom Center */}
+      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-50">
+        {renditionState && <TTSControls bookId={book.id} rendition={renditionState} />}
+      </div>
+    </div>
   )
 }
