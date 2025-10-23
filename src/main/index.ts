@@ -13,6 +13,14 @@ import {
 } from 'electron-devtools-installer'
 import config from './config.json'
 import { IPC_HANDLERS, TTS_EVENTS } from './ipc_handles'
+import { updateElectronApp, UpdateSourceType } from 'update-electron-app'
+
+updateElectronApp({
+  updateSource: {
+    type: UpdateSourceType.StaticStorage,
+    baseUrl: `https://rishi-electron-app.s3.amazonaws.com/rishi-electron-app-updates/${process.platform}/${process.arch}`
+  }
+})
 
 let mainWindow: BrowserWindow | null = null
 
@@ -98,7 +106,6 @@ function iPCHandlers(): void {
       return null
     }
   })
-
 
   ipcMain.handle(IPC_HANDLERS.TTS_SHOULD_DEBUG, (): boolean => {
     if (process.env.NODE_ENV === 'development') {
