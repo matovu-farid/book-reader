@@ -233,9 +233,7 @@ export class TTSQueue extends EventEmitter {
    */
   private async generateAudio(item: QueueItem): Promise<Buffer> {
     try {
-      //const url = `http://${this.openaiProxyUrl}/v1/audio/speech`
-      // const url = `https://api.openai.com/v1/audio/speech`
-      const url = 'http://proxy.matovu-farid.com/api/openai/v1/audio/speech'
+      const url = `http://${this.openaiProxyUrl}/v1/audio/speech`
       console.log('Generating audio for:', url)
       const response = await fetch(url, {
         method: 'POST',
