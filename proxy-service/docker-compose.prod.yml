@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-proxy
+    ports:
+      - '80:80'
+      # - '443:443'
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - openai-tts-proxy
+    restart: unless-stopped
+
+    networks:
+      - proxy-network
+    deploy:
+      replicas: 1
+
+  openai-tts-proxy:
+    image: matovu90/openai-proxy
+
+    container_name: openai-tts-proxy
+
+    ports:
+      - '5458:5458' # Keep for direct access if needed
+    environment:
+      - OPENAI_API_KEY_FILE=/run/secrets/openai_api_key
+      - NODE_ENV=production
+      - PORT=5458
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
+      - RATE_LIMIT_MAX=${RATE_LIMIT_MAX:-100}
+    secrets:
+      - openai_api_key
+    restart: unless-stopped
+
+    networks:
+      - proxy-network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+
+secrets:
+  openai_api_key:
+    file: ./openai_api_key.txt
+
+networks:
+  proxy-network:
+    driver: overlay # overlay -> remote, bridge -> local
